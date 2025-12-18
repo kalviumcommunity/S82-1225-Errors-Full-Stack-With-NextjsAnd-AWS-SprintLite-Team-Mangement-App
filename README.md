@@ -183,6 +183,39 @@ SprintLite demonstrates how a small team can design, build, and deploy a clean, 
 
 ---
 
-## UI Visualization Prompt (For Figma AI / Bolt / Design Tools)
+## Daily Report
 
-"Design a clean, modern task management web application called SprintLite. The app should have a professional but minimal look. Use a light background with subtle shadows. The login page should be centered with simple input fields. The main dashboard should display three vertical columns labeled Todo, In Progress, and Done. Each column contains task cards showing task title, assigned user, and a status change button. Include a top navigation bar with the app name SprintLite and a Create Task button. The Create Task page should have a simple form with inputs for title, description, assigned user, and status. Overall style should feel like a lightweight version of Jira or Trello, clean, readable, and developer-focused."
+### Day 1 - December 18, 2025
+
+**What We Did Today:**
+
+1. **Set Up Database with Prisma**
+   - Connected PostgreSQL database (Neon) to the project
+   - Created database schema with User and Post models
+   - Set up Prisma Client for database operations
+   - Created helper functions to fetch and create users/posts
+
+2. **Environment Configuration**
+   - Created separate environment files for three environments:
+     - `.env.development` - for local development
+     - `.env.staging` - for testing before going live
+     - `.env.production` - for live production use
+   - Each environment has its own database URL and app URL
+   - Installed `env-cmd` package to automatically load the right environment
+
+3. **CI/CD Pipeline Setup**
+   - Created GitHub Actions workflow that runs automatically when we push code
+   - The pipeline does these checks:
+     - Checks code for errors (linting)
+     - Verifies TypeScript types are correct
+     - Tests database connection
+     - Builds the app for different environments
+   - Automatic deployment to the right environment based on which branch we push to:
+     - Push to `develop` branch → deploys to development
+     - Push to `staging` branch → deploys to staging
+     - Push to `main` branch → deploys to production
+
+
+
+---
+
