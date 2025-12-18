@@ -188,7 +188,7 @@ SprintLite demonstrates how a small team can design, build, and deploy a clean, 
 ### Day 1 - December 18, 2025
 
 **What We Did Today:**
-
+#MOHIT :-
 1. **Set Up Database with Prisma**
    - Connected PostgreSQL database (Neon) to the project
    - Created database schema with User and Post models
@@ -215,7 +215,23 @@ SprintLite demonstrates how a small team can design, build, and deploy a clean, 
      - Push to `staging` branch → deploys to staging
      - Push to `main` branch → deploys to production
 
+#VIJAY :-
+4. **Testing & Verification**
+   - Created test scripts to verify database connection
+   - Created verification scripts to check environment separation is working
+   - Tested all three environments - everything working correctly!
 
+**What This Means:**
+We can now develop locally without worrying about breaking production
+When we push code, it gets automatically tested and deployed
+Different team members can work on different environments safely
+Database is connected and ready to use
 
+**Commands Added:**
+npm run dev - Start development server
+npm run verify:dev - Check development environment
+npm run verify:staging - Check staging environment  
+npm run verify:prod - Check production environment
+npm run test:db - Test database connection
 ---
 
