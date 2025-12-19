@@ -183,6 +183,104 @@ SprintLite demonstrates how a small team can design, build, and deploy a clean, 
 
 ---
 
-## UI Visualization Prompt (For Figma AI / Bolt / Design Tools)
+### Daily Report
 
+## Day 1 - December 18, 2025
+
+**What We Did Today:**
+## MOHIT :-
+1. **Set Up Database with Prisma**
+   - Connected PostgreSQL database (Neon) to the project
+   - Created database schema with User and Post models
+   - Set up Prisma Client for database operations
+   - Created helper functions to fetch and create users/posts
+
+2. **Environment Configuration**
+   - Created separate environment files for three environments:
+     - `.env.development` - for local development
+     - `.env.staging` - for testing before going live
+     - `.env.production` - for live production use
+   - Each environment has its own database URL and app URL
+   - Installed `env-cmd` package to automatically load the right environment
+
+3. **CI/CD Pipeline Setup**
+   - Created GitHub Actions workflow that runs automatically when we push code
+   - The pipeline does these checks:
+     - Checks code for errors (linting)
+     - Verifies TypeScript types are correct
+     - Tests database connection
+     - Builds the app for different environments
+   - Automatic deployment to the right environment based on which branch we push to:
+     - Push to `develop` branch → deploys to development
+     - Push to `staging` branch → deploys to staging
+     - Push to `main` branch → deploys to production
+
+## SAM :-
+4. What This Is :-
+ - Static Site Generation (SSG)
+ - Page is rendered once during build
+ - Served as plain HTML afterwards
+
+5. Why This Exists :-
+ - Best performance
+ - Zero runtime server cost
+ - Ideal for marketing / info pages
+
+# The About page uses static rendering because its content is not user-specific and rarely changes, allowing it to be generated once at build time for maximum performance.
+
+## VIJAY :- 
+
+6. What This Is :-
+ - Server-Side Rendering (SSR)
+ - Page is rendered on every request
+ - Uses live database + session data
+
+7. Why force-dynamic :- 
+ - Disables caching
+ - Ensures fresh data every refresh
+ - Correct choice for dashboards
+
+# The dashboard uses server-side rendering to ensure that authenticated users always see the most up-to-date task data tied to their session.
+
+## MOHIT :- 
+
+8. What This Is :-
+ - Incremental Static Regeneration (ISR)
+ - Page is static but updates periodically
+
+9. What revalidate = 60 Means :-
+ - Page is cached
+ - Regenerated at most once every 60 seconds
+ - Combines speed + freshness
+
+10. Why This Page Exists :-
+ - Team-wide stats
+ - Does not need per-request freshness
+ - Perfect hybrid use case
+
+# The task overview page uses ISR to balance performance and data freshness by periodically revalidating static content.
+
+##VIJAY :-
+11. **Testing & Verification**
+   - Created test scripts to verify database connection
+   - Created verification scripts to check environment separation is working
+   - Tested all three environments - everything working correctly!
+
+**What This Means:**
+We can now develop locally without worrying about breaking production
+When we push code, it gets automatically tested and deployed
+Different team members can work on different environments safely
+Database is connected and ready to use
+
+**Commands Added:**
+npm run dev - Start development server
+npm run verify:dev - Check development environment
+npm run verify:staging - Check staging environment  
+npm run verify:prod - Check production environment
+npm run test:db - Test database connection
+---
+
+<<<<<<< HEAD
 "Design a clean, modern task management web application called SprintLite. The app should have a professional but minimal look. Use a light background with subtle shadows. The login page should be centered with simple input fields. The main dashboard should display three vertical columns labeled Todo, In Progress, and Done. Each column contains task cards showing task title, assigned user, and a status change button. Include a top navigation bar with the app name SprintLite and a Create Task button. The Create Task page should have a simple form with inputs for title, description, assigned user, and status. Overall style should feel like a lightweight version of Jira or Trello, clean, readable, and developer-focused."
+=======
+>>>>>>> a4acd991169b090fd48987ac73eca5fc1ed55f9a
