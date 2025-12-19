@@ -183,12 +183,12 @@ SprintLite demonstrates how a small team can design, build, and deploy a clean, 
 
 ---
 
-## Daily Report
+### Daily Report
 
-### Day 1 - December 18, 2025
+## Day 1 - December 18, 2025
 
 **What We Did Today:**
-#MOHIT :-
+## MOHIT :-
 1. **Set Up Database with Prisma**
    - Connected PostgreSQL database (Neon) to the project
    - Created database schema with User and Post models
@@ -215,8 +215,53 @@ SprintLite demonstrates how a small team can design, build, and deploy a clean, 
      - Push to `staging` branch → deploys to staging
      - Push to `main` branch → deploys to production
 
-#VIJAY :-
-4. **Testing & Verification**
+## SAM :-
+4. What This Is :-
+ - Static Site Generation (SSG)
+ - Page is rendered once during build
+ - Served as plain HTML afterwards
+
+5. Why This Exists :-
+ - Best performance
+ - Zero runtime server cost
+ - Ideal for marketing / info pages
+
+# The About page uses static rendering because its content is not user-specific and rarely changes, allowing it to be generated once at build time for maximum performance.
+
+## VIJAY :- 
+
+6. What This Is :-
+ - Server-Side Rendering (SSR)
+ - Page is rendered on every request
+ - Uses live database + session data
+
+7. Why force-dynamic :- 
+ - Disables caching
+ - Ensures fresh data every refresh
+ - Correct choice for dashboards
+
+# The dashboard uses server-side rendering to ensure that authenticated users always see the most up-to-date task data tied to their session.
+
+## MOHIT :- 
+
+8. What This Is :-
+ - Incremental Static Regeneration (ISR)
+ - Page is static but updates periodically
+
+9. What revalidate = 60 Means :-
+ - Page is cached
+ - Regenerated at most once every 60 seconds
+ - Combines speed + freshness
+
+10. Why This Page Exists :-
+ - Team-wide stats
+ - Does not need per-request freshness
+ - Perfect hybrid use case
+
+# The task overview page uses ISR to balance performance and data freshness by periodically revalidating static content.
+
+##VIJAY :-
+11. **Testing & Verification**
    - Created test scripts to verify database connection
    - Created verification scripts to check environment separation is working
    - Tested all three environments - everything working correctly!
@@ -234,4 +279,5 @@ npm run verify:staging - Check staging environment
 npm run verify:prod - Check production environment
 npm run test:db - Test database connection
 ---
+=======
 
