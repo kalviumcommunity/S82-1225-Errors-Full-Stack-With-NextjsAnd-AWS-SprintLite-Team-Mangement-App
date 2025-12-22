@@ -226,8 +226,7 @@ SprintLite demonstrates how a small team can design, build, and deploy a clean, 
  - Zero runtime server cost
  - Ideal for marketing / info pages
 
- Conclusion :- Done with today's task of adding SSG,SSR,hybrid(ISR).
- Collaborated with my peers ,they assisted me in the flow.
+ Conclusion :- Done with today's task of adding SSG,SSR,hybrid(ISR). Collaborated with my peers ,they assisted me in the flow.
  Hence marking - add data fetching techniques(issue-2) closed.
 
 # The About page uses static rendering because its content is not user-specific and rarely changes, allowing it to be generated once at build time for maximum performance.
