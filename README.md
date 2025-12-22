@@ -280,7 +280,3 @@ npm run verify:prod - Check production environment
 npm run test:db - Test database connection
 ---
 
-<<<<<<< HEAD
-"Design a clean, modern task management web application called SprintLite. The app should have a professional but minimal look. Use a light background with subtle shadows. The login page should be centered with simple input fields. The main dashboard should display three vertical columns labeled Todo, In Progress, and Done. Each column contains task cards showing task title, assigned user, and a status change button. Include a top navigation bar with the app name SprintLite and a Create Task button. The Create Task page should have a simple form with inputs for title, description, assigned user, and status. Overall style should feel like a lightweight version of Jira or Trello, clean, readable, and developer-focused."
-=======
->>>>>>> a4acd991169b090fd48987ac73eca5fc1ed55f9a
