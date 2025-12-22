@@ -282,10 +282,16 @@ npm run verify:staging - Check staging environment
 npm run verify:prod - Check production environment
 npm run test:db - Test database connection
 
-### DAY 2 :- 
+### DAY 2 :-
+
 ## VIJAY :-
  - Done with all the defined requirements for the Low level desgin , worked with the technical team for suggestions.
  - Link :- https://www.figma.com/design/nfVUe4l7O2ZACUlpsUmIyw/Untitled?node-id=0-1&t=iBc5PKdTFVvyAZ2U-1
+
+
+ ## SAM :-
+ - Done with the high level designing of the app required by the low level desining.
+ - Link :- https://www.figma.com/design/zOh7mzTTkG8jjGfUD96iUP/Untitled?node-id=0-1&t=AaAhS0fodn73jqti-1
 ---
 
 <<<<<<< HEAD
