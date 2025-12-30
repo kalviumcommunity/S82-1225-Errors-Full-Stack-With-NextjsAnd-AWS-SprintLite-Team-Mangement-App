@@ -15,7 +15,7 @@ export default async function DashboardPage(){
 
             {tasks.map( task => (
                 <div key={task.id} >
-                    task.title - task.status
+                    {task.title} - {task.status}
                 </div>
             ))}
 

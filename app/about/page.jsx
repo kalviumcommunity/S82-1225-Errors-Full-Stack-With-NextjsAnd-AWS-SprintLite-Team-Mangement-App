@@ -4,7 +4,7 @@
 
 export const revalidate = false;
 
-export function AboutPage(){
+export default function AboutPage(){
     console.log("About Page Rendered at BUILD TIME");
 
     return(
