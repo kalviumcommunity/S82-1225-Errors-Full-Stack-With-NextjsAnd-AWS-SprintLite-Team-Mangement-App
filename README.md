@@ -283,6 +283,8 @@ npm run verify:prod - Check production environment
 npm run test:db - Test database connection
 
 ### DAY 2 :-
+ ## MOHIT :-
+  - done with the .env stagings , learned the concept and exploreed everything, learned why secret management is important and all .
 
 ## VIJAY :-
  - Done with all the defined requirements for the Low level desgin , worked with the technical team for suggestions.
@@ -292,6 +294,8 @@ npm run test:db - Test database connection
  ## SAM :-
  - Done with the high level designing of the app required by the low level desining.
  - Link :- https://www.figma.com/design/zOh7mzTTkG8jjGfUD96iUP/Untitled?node-id=0-1&t=AaAhS0fodn73jqti-1
+ ![alt text](image.png)
+
 ---
 
 <<<<<<< HEAD
