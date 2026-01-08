@@ -1,0 +1,75 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: sprintlite-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: sprintlite
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-secure_password_change_me}
+      POSTGRES_DB: sprintlite
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sprintlite"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - sprintlite-network
+
+  # Redis for Sessions and Caching
+  redis:
+    image: redis:7-alpine
+    container_name: sprintlite-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - sprintlite-network
+
+  # Next.js Application
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: sprintlite-app
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://sprintlite:${DB_PASSWORD:-secure_password_change_me}@postgres:5432/sprintlite
+      REDIS_URL: redis://redis:6379
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - sprintlite-network
+
+# Persistent volumes for data
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+# Network for inter-container communication
+networks:
+  sprintlite-network:
+    driver: bridge
