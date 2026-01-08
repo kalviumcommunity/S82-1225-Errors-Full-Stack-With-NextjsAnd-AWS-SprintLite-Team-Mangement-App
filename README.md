@@ -643,6 +643,13 @@ The foundation we've built here will scale with SprintLite as we grow from a tea
 
 ---
 
+## SAM :-
+**High-Level Design (HLD) - System Architecture**
+
+Created comprehensive system architecture diagram in Figma covering SprintLite's full-stack deployment with Next.js frontend, API Routes backend, PostgreSQL + Prisma data layer, Redis caching, AWS cloud topology (EC2, RDS, ElastiCache, S3, CloudFront), GitHub Actions CI/CD pipeline, secrets management via AWS Secrets Manager, and observability with CloudWatch + Sentry. Documented all data flows, security boundaries, caching strategies, and deployment stages.
+
+**Figma Link:** https://www.figma.com/design/zOh7mzTTkG8jjGfUD96iUP/Untitled?node-id=0-1&t=AaAhS0fodn73jqti-1
+
 <<<<<<< HEAD
 =======
 =======
