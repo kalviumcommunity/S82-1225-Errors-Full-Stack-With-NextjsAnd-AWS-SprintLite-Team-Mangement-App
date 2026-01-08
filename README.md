@@ -650,6 +650,31 @@ Created comprehensive system architecture diagram in Figma covering SprintLite's
 
 **Figma Link:** https://www.figma.com/design/zOh7mzTTkG8jjGfUD96iUP/Untitled?node-id=0-1&t=AaAhS0fodn73jqti-1
 
+---
+
+## VIJAY :-
+**Low-Level Design (LLD) - Detailed Component Architecture**
+
+Created detailed Low-Level Design in Figma documenting SprintLite's complete implementation architecture including frontend component structure with data flow (props/state/context), backend API routes with input/output schemas, complete database schema with Prisma models and relationships, Redis caching logic with key structures and TTLs, error handling and validation flows, and cloud service mapping to AWS resources (EC2, RDS, ElastiCache, S3).
+
+**Components Covered:**
+- **Frontend:** Page components (Sign In, Dashboard, Task Detail), reusable components (TaskCard, StatusBadge, UserAvatar), layout structure, state management patterns, data fetching hooks
+- **Backend:** API endpoints (`/api/auth/login`, `/api/tasks`, `/api/users`), Server Actions for mutations, validation middleware, error handling patterns, response formats
+- **Database Schema:** Users, Tasks, Comments, Sessions tables with foreign keys, indexes on email/status/assignedTo, Prisma models with relations
+- **Caching:** Redis key structure (`session:{userId}`, `tasks:{userId}`), TTL policies (sessions: 24h, tasks: 5min), cache invalidation logic
+- **Error Handling:** Frontend validation → API validation → Database errors → Formatted responses with proper status codes
+- **Cloud Mapping:** Components mapped to AWS services (Next.js on EC2, PostgreSQL on RDS, Redis on ElastiCache, assets on S3)
+
+**Figma Link:** https://www.figma.com/design/nfVUe4l7O2ZACUlpsUmIyw/Untitled?node-id=0-1&t=iBc5PKdTFVvyAZ2U-1
+
+**Key Details:**
+- Logical consistency maintained with HLD and user flows
+- Clear component-to-API-to-database mapping
+- Data flow paths documented for create/read/update operations
+- Authentication flow from login form → API → session creation → Redis cache
+- Task management flow from dashboard → API → Prisma → PostgreSQL
+- Visual clarity with labeled entities and relationship arrows
+
 <<<<<<< HEAD
 =======
 =======
