@@ -20,11 +20,16 @@
     "verify:dev": "env-cmd -f .env.development node scripts/verify-env.js",
     "verify:staging": "env-cmd -f .env.staging node scripts/verify-env.js",
     "verify:prod": "env-cmd -f .env.production node scripts/verify-env.js",
+    "db:seed": "node prisma/seed.mjs",
     "prepare": "husky"
+  },
+  "prisma": {
+    "seed": "node prisma/seed.mjs"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.2.0",
     "@prisma/client": "^7.2.0",
+    "bcryptjs": "^3.0.3",
     "next": "16.0.10",
     "pg": "^8.16.3",
     "prisma": "^7.2.0",

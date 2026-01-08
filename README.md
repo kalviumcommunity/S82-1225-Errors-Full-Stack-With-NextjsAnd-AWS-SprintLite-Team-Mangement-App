@@ -1964,4 +1964,352 @@ docker exec sprintlite-app npx prisma db push
 3. **Full API Test Suite:** Test all endpoints once bug is fixed
 4. **AWS Preparation:** Begin EC2 setup for cloud deployment (DAY 6+)
 
+---
+### DAY 6 :- 
+ ## MOHIT :- 
+## Database Design & Normalization
 
+### Overview
+
+SprintLite uses **PostgreSQL** as its primary database, accessed through **Prisma ORM**. The schema is designed following **database normalization principles** (1NF, 2NF, 3NF) to ensure data integrity, minimize redundancy, and support efficient queries.
+
+### Entity-Relationship Structure
+
+**Core Entities:**
+- **User** - Application users with authentication credentials
+- **Task** - Central entity for task management
+- **Comment** - Task discussion/activity feed
+- **Session** - User authentication sessions
+- **Post** - Legacy model (can be removed)
+
+**Key Relationships:**
+- `User` → `Task` (One-to-Many as Creator)
+- `User` → `Task` (One-to-Many as Assignee)
+- `Task` → `Comment` (One-to-Many)
+- `User` → `Comment` (One-to-Many)
+- `User` → `Session` (One-to-Many)
+
+### Complete Prisma Schema
+
+```prisma
+// User model - Authenticated users of the application
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String
+  password  String   // Hashed password (bcrypt)
+  role      String   @default("Member") // Owner, Admin, Member
+  avatar    String?  // Avatar URL or color code
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relations (prevents N+1 query problem)
+  createdTasks  Task[]    @relation("TaskCreator")
+  assignedTasks Task[]    @relation("TaskAssignee")
+  comments      Comment[]
+  sessions      Session[]
+}
+
+// Task model - Core task entity with status and priority
+model Task {
+  id          String    @id @default(cuid())
+  title       String
+  description String?
+  status      String    @default("Todo") // Todo, InProgress, Done
+  priority    String    @default("Medium") // Low, Medium, High
+  dueDate     DateTime?
+  
+  // Foreign Keys
+  creatorId   String
+  creator     User     @relation("TaskCreator", fields: [creatorId], references: [id], onDelete: Cascade)
+  
+  assigneeId  String?
+  assignee    User?    @relation("TaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  
+  comments    Comment[]
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Performance indexes for common queries
+  @@index([status])      // Filter by status
+  @@index([priority])    // Filter by priority
+  @@index([assigneeId])  // Filter by assignee
+  @@index([createdAt])   // Sort by creation date
+}
+
+// Comment model - Activity feed for tasks
+model Comment {
+  id      String @id @default(cuid())
+  content String
+  
+  // Foreign Keys (Cascade delete ensures orphaned records don't exist)
+  taskId String
+  task   Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@index([taskId])  // Fetch all comments for a task
+  @@index([userId])  // Fetch all comments by user
+}
+
+// Session model - User authentication sessions
+model Session {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  expiresAt DateTime
+  
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@index([token])   // Fast session lookup
+  @@index([userId])  // Fetch all sessions for a user
+}
+```
+
+### Normalization Analysis
+
+#### **1NF (First Normal Form)** ✅
+- **All fields are atomic** (no arrays, no JSON blobs storing multiple values)
+- **Each table has a primary key** (`id` field with `cuid()` generation)
+- **No repeating groups** (comments stored separately, not as task property)
+
+**Example:** Task status is a single value (`"Todo"`, not `["Todo", "Done"]`)
+
+#### **2NF (Second Normal Form)** ✅
+- **Achieves 1NF** ✓
+- **No partial dependencies** (all non-key attributes depend on entire primary key)
+- **Single-column primary keys** ensure no composite key issues
+
+**Example:** In `Comment` table, both `content` and `createdAt` depend on the full primary key (`id`), not just part of it.
+
+#### **3NF (Third Normal Form)** ✅
+- **Achieves 2NF** ✓
+- **No transitive dependencies** (non-key fields don't depend on other non-key fields)
+- **Separate User table** prevents storing user data redundantly in Task/Comment tables
+
+**Before Normalization (Bad):**
+```javascript
+Task {
+  id: "task_1",
+  title: "Setup Docker",
+  creatorName: "Mohit",  // ❌ Redundant
+  creatorEmail: "mohit@sprintlite.com" // ❌ Redundant
+}
+```
+
+**After Normalization (Good):**
+```javascript
+Task {
+  id: "task_1",
+  title: "Setup Docker",
+  creatorId: "user_123" // ✅ Reference only
+}
+
+User {
+  id: "user_123",
+  name: "Mohit",
+  email: "mohit@sprintlite.com"
+}
+```
+
+### Scalability Considerations
+
+#### **Query Performance Optimizations**
+
+1. **Strategic Indexes**
+   ```sql
+   -- Common dashboard query (indexed fields)
+   SELECT * FROM "Task" WHERE "status" = 'InProgress' AND "assigneeId" = 'user_123';
+   
+   -- Session lookup (unique index on token)
+   SELECT * FROM "Session" WHERE "token" = 'session_token_mohit_123';
+   ```
+
+2. **Cascade Behaviors**
+   - `onDelete: Cascade` → When a user is deleted, their tasks/comments are automatically cleaned up
+   - `onDelete: SetNull` → When a task assignee is deleted, task remains but assignee becomes `null`
+
+3. **Connection Pooling**
+   - Prisma uses `@prisma/adapter-pg` with connection pooling
+   - Prevents database connection exhaustion under load
+
+#### **Common Query Patterns**
+
+```javascript
+// Dashboard: Get all tasks with creator and assignee info
+const tasks = await prisma.task.findMany({
+  include: {
+    creator: true,   // JOIN User table
+    assignee: true,  // JOIN User table
+    comments: {
+      include: { user: true }  // Nested JOIN
+    }
+  },
+  where: { status: 'InProgress' }, // Uses index
+  orderBy: { createdAt: 'desc' }   // Uses index
+});
+
+// User profile: Get user with all created tasks
+const user = await prisma.user.findUnique({
+  where: { email: 'mohit@sprintlite.com' },
+  include: {
+    createdTasks: true,
+    assignedTasks: true,
+    comments: true
+  }
+});
+
+// Session validation
+const session = await prisma.session.findUnique({
+  where: { token: sessionToken }, // Fast unique index lookup
+  include: { user: true }
+});
+```
+
+#### **Future Scalability**
+
+- **Read Replicas:** PostgreSQL read replicas for dashboard queries (separate read/write connections)
+- **Redis Caching:** Cache frequently accessed tasks/sessions (already configured in Docker)
+- **Partitioning:** Time-based partitioning on `createdAt` for Task/Comment tables (when > 1M records)
+- **Full-Text Search:** Add `tsvector` column for task title/description search (PostgreSQL FTS)
+
+### Seed Data
+
+The database is populated with realistic sample data for testing:
+
+**Users (3):**
+```javascript
+{
+  email: 'mohit@sprintlite.com',
+  name: 'Mohit Kumar Samal',
+  role: 'Owner',
+  password: bcrypt.hash('password123')
+}
+// + sam@sprintlite.com (Admin)
+// + vijay@sprintlite.com (Member)
+```
+
+**Tasks (6):**
+- 2 Completed: "Setup Docker containers", "Update Prisma schema"
+- 2 In Progress: "Implement JWT authentication", "Fix task filtering bug"
+- 2 Todo: "Create API documentation", "Add Redis caching"
+
+**Comments (5):**
+- Realistic team discussions on tasks
+- Examples: "Docker containers are up and running successfully!", "Found the issue! The filter state wasn't being passed to the API query."
+
+**Sessions (2):**
+- Active sessions for mohit and sam (24-hour expiry)
+
+**Seed Command:**
+```bash
+npm run db:seed
+```
+
+**Test Credentials:**
+```
+Email: mohit@sprintlite.com
+Email: sam@sprintlite.com
+Email: vijay@sprintlite.com
+Password (all): password123
+```
+
+### Migration History
+
+#### Initial Schema Creation
+```bash
+npx prisma db push  # Sync schema to database without migration files
+```
+
+**Tables Created:**
+- `User` (5 indexes: email_unique, id_primary, 3 timestamp indexes)
+- `Task` (6 indexes: status, priority, assigneeId, createdAt, id_primary, creator FK)
+- `Comment` (4 indexes: taskId, userId, id_primary, 2 FK indexes)
+- `Session` (4 indexes: token_unique, userId, id_primary, user FK)
+- `Post` (1 index: id_primary) - Legacy, can be removed
+
+**Database Statistics:**
+- Total tables: 5
+- Total indexes: 19
+- Referential integrity: All foreign keys enforced with ON DELETE behaviors
+
+### Viewing Database
+
+**Prisma Studio (GUI):**
+```bash
+npx prisma studio
+# Opens at http://localhost:5555
+```
+
+**Direct PostgreSQL Access:**
+```bash
+# Using Docker
+docker exec -it sprintlite-db psql -U postgres -d neondb
+
+# SQL queries
+SELECT COUNT(*) FROM "User";
+SELECT * FROM "Task" WHERE status = 'InProgress';
+```
+
+### Database Diagrams
+
+**ER Diagram:** *(To be created using Draw.io/Lucidchart)*
+
+```
+┌─────────────┐
+│    User     │
+│─────────────│
+│ id (PK)     │
+│ email       │◄───┐
+│ name        │    │
+│ password    │    │
+│ role        │    │
+│ avatar      │    │
+└─────────────┘    │
+       │           │
+       │ 1:N       │
+       ▼           │
+┌─────────────┐    │
+│    Task     │    │
+│─────────────│    │
+│ id (PK)     │    │
+│ title       │    │
+│ description │    │
+│ status      │    │
+│ priority    │    │
+│ creatorId   │────┘ (FK)
+│ assigneeId  │───┐ (FK, nullable)
+└─────────────┘   │
+       │          │
+       │ 1:N      │ 1:N
+       ▼          │
+┌─────────────┐   │
+│  Comment    │   │
+│─────────────│   │
+│ id (PK)     │   │
+│ content     │   │
+│ taskId (FK) │   │
+│ userId (FK) │───┘
+└─────────────┘
+
+┌─────────────┐
+│  Session    │
+│─────────────│
+│ id (PK)     │
+│ token       │
+│ userId (FK) │───┐
+│ expiresAt   │   │ 1:N
+└─────────────┘   │
+                  ▼
+              (back to User)
+```
+
+---

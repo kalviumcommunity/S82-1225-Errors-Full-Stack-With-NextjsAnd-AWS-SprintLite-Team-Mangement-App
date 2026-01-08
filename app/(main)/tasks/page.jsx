@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 export default function AllTasksPage() {
   return (
     <div className="p-8">
@@ -45,9 +47,9 @@ export default function AllTasksPage() {
             {/* Task Row 1 */}
             <tr className="hover:bg-gray-850 cursor-pointer transition-colors">
               <td className="px-6 py-4">
-                <a href="/tasks/1" className="text-blue-400 hover:text-blue-300 font-medium">
+                <Link href="/tasks/1" className="text-blue-400 hover:text-blue-300 font-medium">
                   Design authentication flow
-                </a>
+                </Link>
               </td>
               <td className="px-6 py-4">
                 <div className="flex items-center gap-2">
@@ -72,9 +74,9 @@ export default function AllTasksPage() {
             {/* Task Row 2 */}
             <tr className="hover:bg-gray-850 cursor-pointer transition-colors">
               <td className="px-6 py-4">
-                <a href="/tasks/2" className="text-blue-400 hover:text-blue-300 font-medium">
+                <Link href="/tasks/2" className="text-blue-400 hover:text-blue-300 font-medium">
                   Setup database schema
-                </a>
+                </Link>
               </td>
               <td className="px-6 py-4">
                 <div className="flex items-center gap-2">
