@@ -23,8 +23,8 @@ export default function TaskDetailPage() {
           <div className="bg-gray-900 rounded-lg p-6 border border-gray-800">
             <h2 className="text-white font-semibold mb-3">Description</h2>
             <p className="text-gray-300 leading-relaxed">
-              Create a comprehensive authentication system that supports email, password, and OAuth providers.
-              Should include forgot password, 2FA, and rate limiting.
+              Create a comprehensive authentication system that supports email, password, and OAuth
+              providers. Should include forgot password, 2FA, and rate limiting.
             </p>
           </div>
 
@@ -34,7 +34,7 @@ export default function TaskDetailPage() {
             <div className="space-y-4">
               {/* Activity Item 1 */}
               <div className="flex gap-3">
-                <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white text-sm font-semibold flex-shrink-0">
+                <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white text-sm font-semibold shrink-0">
                   AC
                 </div>
                 <div className="flex-1">
@@ -46,7 +46,7 @@ export default function TaskDetailPage() {
 
               {/* Activity Item 2 */}
               <div className="flex gap-3">
-                <div className="w-8 h-8 bg-purple-600 rounded-full flex items-center justify-center text-white text-sm font-semibold flex-shrink-0">
+                <div className="w-8 h-8 bg-purple-600 rounded-full flex items-center justify-center text-white text-sm font-semibold shrink-0">
                   JS
                 </div>
                 <div className="flex-1">
