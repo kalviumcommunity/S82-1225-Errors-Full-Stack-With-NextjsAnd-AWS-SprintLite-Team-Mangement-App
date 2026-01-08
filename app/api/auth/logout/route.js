@@ -1,7 +1,7 @@
-import { NextResponse } from 'next/server';
+import { NextResponse } from "next/server";
 
 // POST /api/auth/logout - User logout
-export async function POST(request) {
+export async function POST() {
   try {
     // TODO: Implement logout logic
     // 1. Clear session
@@ -10,12 +10,9 @@ export async function POST(request) {
 
     return NextResponse.json({
       success: true,
-      message: 'Logged out successfully'
+      message: "Logged out successfully",
     });
-  } catch (error) {
-    return NextResponse.json(
-      { error: 'Logout failed' },
-      { status: 500 }
-    );
+  } catch {
+    return NextResponse.json({ error: "Logout failed" }, { status: 500 });
   }
 }

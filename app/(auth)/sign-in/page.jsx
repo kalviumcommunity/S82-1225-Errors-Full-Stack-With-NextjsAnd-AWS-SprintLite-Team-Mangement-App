@@ -73,7 +73,7 @@ export default function SignInPage() {
 
         {/* Sign Up Link */}
         <p className="mt-6 text-center text-gray-400 text-sm">
-          Don't have an account?{' '}
+          Don&apos;t have an account?{" "}
           <a href="/sign-up" className="text-blue-500 hover:text-blue-400">
             Create one
           </a>
