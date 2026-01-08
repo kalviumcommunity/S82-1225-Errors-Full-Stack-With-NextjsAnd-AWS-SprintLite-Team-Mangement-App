@@ -934,3 +934,361 @@ npm run build             # Type-check with strict TypeScript
 
 ---
 
+##  VIJAY :-
+ Environment Variables & Configuration Management (MOHIT, VIJAY)
+
+**Contributors:** MOHIT KUMAR SAMAL (Setup), VIJAY (Security Validation)  
+**Objective:** Implement secure environment variable management with clear separation between server-side secrets and client-side configuration, following Next.js best practices.
+
+### Why Environment Variables Matter
+
+**Security & Flexibility:**
+- **Secrets Protection:** Database credentials, API keys, and authentication tokens never hardcoded in source code
+- **Environment Separation:** Different configurations for development, staging, and production without code changes
+- **Build-Time Safety:** Next.js validates environment variables at build time, catching missing configurations early
+- **Zero Trust:** Secrets injected via CI/CD or cloud providers, never committed to Git
+
+**Next.js Specific Behavior:**
+- Variables are embedded at **BUILD TIME**, not runtime
+- Changing `.env` after build requires **rebuild**: `npm run build`
+- Two variable types: server-only and client-exposed (NEXT_PUBLIC_)
+
+### Server-Side vs Client-Side Variables
+
+**🔒 SERVER-SIDE ONLY (No Prefix)**
+
+Variables **without** `NEXT_PUBLIC_` prefix are:
+- ✅ Only accessible in API routes, server components, `getServerSideProps`, `getStaticProps`
+- ✅ NEVER exposed to browser or client-side JavaScript bundle
+- ✅ Safe for secrets: database URLs, API keys, authentication tokens, SMTP passwords
+- ❌ Will be `undefined` if accessed in client components or browser code
+
+**Example Server-Side Variables:**
+```bash
+DATABASE_URL=postgresql://user:pass@host:5432/db       # Database credentials
+NEXTAUTH_SECRET=your_secret_key                        # JWT signing key
+AWS_SECRET_ACCESS_KEY=secret_key                       # Cloud provider secrets
+SMTP_PASSWORD=email_password                           # Email service credentials
+```
+
+**Where to use:**
+- `app/api/**/*.js` - API routes (server-side)
+- `lib/db.js` - Database connections
+- Server Components (default in App Router)
+- `getServerSideProps` / `getStaticProps`
+
+**🌐 CLIENT-SIDE SAFE (NEXT_PUBLIC_ Prefix)**
+
+Variables **with** `NEXT_PUBLIC_` prefix are:
+- ✅ Exposed to browser and included in client-side JavaScript bundle
+- ✅ Accessible in client components, browser console, Network tab
+- ✅ Safe for public configuration: API endpoints, feature flags, analytics IDs
+- ❌ NEVER use for secrets (visible to anyone inspecting your website)
+
+**Example Client-Side Variables:**
+```bash
+NEXT_PUBLIC_APP_URL=http://localhost:3000              # Frontend URL (public)
+NEXT_PUBLIC_APP_ENV=development                        # Environment name (public)
+NEXT_PUBLIC_SENTRY_DSN=https://key@sentry.io/id       # Public error tracking DSN
+NEXT_PUBLIC_ENABLE_DEBUG=true                          # Feature flags (public)
+```
+
+**Where to use:**
+- Client Components (`'use client'`)
+- Browser-side JavaScript
+- Public configuration that users can see
+
+### Our Environment Files Structure
+
+**`.env.local` (Your Personal Machine)**
+- Purpose: Local development overrides for individual developers
+- Git Status: **IGNORED** (never commit)
+- Use Case: Personal database connections, local API keys, testing credentials
+- Priority: Highest (overrides all other .env files)
+
+**`.env.development` (Team Development)**
+- Purpose: Shared development configuration for the entire team
+- Git Status: **COMMITTED** (team shares this)
+- Use Case: Development database (Neon), local API endpoints, dev feature flags
+- Priority: Loaded when `NODE_ENV=development`
+
+**`.env.staging` (Staging Environment)**
+- Purpose: Pre-production testing environment configuration
+- Git Status: **COMMITTED** (structure only, real secrets via CI/CD)
+- Use Case: Staging database, staging API URLs, near-production testing
+- Priority: Loaded when `NEXT_PUBLIC_APP_ENV=staging`
+
+**`.env.production` (Production Environment)**
+- Purpose: Production environment configuration
+- Git Status: **COMMITTED** (structure only, real secrets via AWS Secrets Manager)
+- Use Case: Production database, live API URLs, production feature flags
+- Priority: Loaded when `NEXT_PUBLIC_APP_ENV=production`
+
+**`.env.example` (Template)**
+- Purpose: Documentation and template for all environment variables
+- Git Status: **COMMITTED** (required for team onboarding)
+- Use Case: Shows all required variables with placeholder values and detailed comments
+- Content: **ONLY PLACEHOLDER VALUES** - never real secrets
+
+### Environment Variables in Use
+
+**Application Configuration:**
+```bash
+# Server-side: Controls Node.js behavior
+NODE_ENV=development|production
+
+# Client-side: Environment identifier shown in UI
+NEXT_PUBLIC_APP_ENV=development|staging|production
+
+# Client-side: Frontend URL for CORS, redirects
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+```
+
+**Database (Server-Side Only):**
+```bash
+# 🔒 PostgreSQL connection - NEVER prefix with NEXT_PUBLIC_
+# Used by: Prisma ORM, API routes
+# Security: Contains credentials (username, password)
+DATABASE_URL=postgresql://user:password@host:5432/database
+```
+
+**Authentication (Server-Side Only):**
+```bash
+# 🔒 NextAuth secrets - MUST remain server-side
+# Used for: JWT signing, session encryption
+# Generate with: openssl rand -base64 32
+NEXTAUTH_URL=http://localhost:3000
+NEXTAUTH_SECRET=your_32_character_minimum_secret_key
+```
+
+**Caching (Server-Side Only):**
+```bash
+# 🔒 Redis connection - Contains credentials
+# Used for: Session storage, API caching
+REDIS_URL=redis://default:password@host:6379
+```
+
+**Email Service (Server-Side Only):**
+```bash
+# 🔒 SMTP credentials - MUST remain server-side
+SMTP_HOST=smtp.example.com
+SMTP_PORT=587
+SMTP_USER=your_username
+SMTP_PASSWORD=your_password
+```
+
+**Cloud Services (Server-Side Only):**
+```bash
+# 🔒 AWS credentials - MUST remain server-side
+AWS_REGION=us-east-1
+AWS_ACCESS_KEY_ID=AKIA_YOUR_KEY
+AWS_SECRET_ACCESS_KEY=your_secret_key
+AWS_S3_BUCKET_NAME=sprintlite-uploads
+```
+
+**Third-Party Services (Client-Side Safe):**
+```bash
+# 🌐 Sentry error tracking - DSN is public
+NEXT_PUBLIC_SENTRY_DSN=https://public_key@sentry.io/id
+
+# 🌐 Analytics - Tracking IDs are public
+NEXT_PUBLIC_GOOGLE_ANALYTICS_ID=G-XXXXXXXXXX
+```
+
+**Feature Flags (Client-Side):**
+```bash
+# 🌐 Toggle features per environment (public)
+NEXT_PUBLIC_ENABLE_ANALYTICS=true
+NEXT_PUBLIC_ENABLE_DEBUG=false
+NEXT_PUBLIC_ENABLE_COMMENTS=true
+```
+
+### How to Set Up Your Local Environment
+
+**Step 1: Copy Template**
+```bash
+# Copy .env.example to create your local environment file
+cp .env.example .env.local
+```
+
+**Step 2: Fill in Values**
+Open `.env.local` and replace placeholder values with real credentials:
+```bash
+# Use the shared Neon database for development
+DATABASE_URL='postgresql://neondb_owner:npg_uj9Z...@ep-purple-boat.neon.tech/neondb'
+
+# Or use your local PostgreSQL
+DATABASE_URL='postgresql://postgres:password@localhost:5432/sprintlite'
+
+# Generate your own auth secret
+NEXTAUTH_SECRET=$(openssl rand -base64 32)
+```
+
+**Step 3: Verify Configuration**
+```bash
+# Run environment verification script
+npm run verify:dev
+
+# Output shows loaded variables (credentials masked):
+# NODE_ENV:              development
+# NEXT_PUBLIC_APP_ENV:   development
+# NEXT_PUBLIC_APP_URL:   http://localhost:3000
+# DATABASE_URL:          postgresql://neondb_owner:npg_...
+```
+
+**Step 4: Test Database Connection**
+```bash
+# Test Prisma connection
+npm run db:generate
+npm run test:db
+
+# Should output: ✅ Database connection successful
+```
+
+### Common Pitfalls & Solutions
+
+**❌ Pitfall 1: Exposing Secrets with NEXT_PUBLIC_**
+```bash
+# WRONG - Database credentials exposed to browser!
+NEXT_PUBLIC_DATABASE_URL=postgresql://user:pass@host/db
+
+# RIGHT - No prefix keeps it server-side only
+DATABASE_URL=postgresql://user:pass@host/db
+```
+
+**❌ Pitfall 2: Using Server Variables in Client Components**
+```javascript
+// WRONG - Will be undefined in client component
+'use client';
+export default function Page() {
+  const dbUrl = process.env.DATABASE_URL; // ❌ undefined!
+}
+
+// RIGHT - Use server-side variables in API routes
+// app/api/tasks/route.js
+export async function GET() {
+  const dbUrl = process.env.DATABASE_URL; // ✅ Works!
+}
+```
+
+**❌ Pitfall 3: Expecting Runtime Changes**
+```bash
+# WRONG - Changing .env after build has no effect
+npm run build
+# ... later ...
+# Change DATABASE_URL in .env
+npm run start  # ❌ Still uses old value!
+
+# RIGHT - Rebuild after changing environment variables
+npm run build  # ✅ Picks up new values
+npm run start
+```
+
+**❌ Pitfall 4: Committing .env.local**
+```bash
+# WRONG - Accidentally committing secrets
+git add .env.local
+git commit -m "Add config"  # ❌ Secrets now in Git history!
+
+# RIGHT - Verify .gitignore protects .env.local
+cat .gitignore | grep .env
+# Should show: .env*
+#              !.env.example
+```
+
+**❌ Pitfall 5: Missing Variables in Production**
+```bash
+# WRONG - Forgot to set DATABASE_URL in production
+npm run build:production  # ❌ Build fails: Missing DATABASE_URL
+
+# RIGHT - Set all required variables in CI/CD or cloud provider
+# GitHub Actions: Repository Settings → Secrets
+# AWS: Use AWS Secrets Manager
+# Vercel: Environment Variables in dashboard
+```
+
+### Security Best Practices Implemented
+
+✅ **Git Protection:**
+- `.env.local` in `.gitignore` (never committed)
+- Only `.env.example` tracked in version control
+- All sensitive files ignored: `.env.development`, `.env.staging`, `.env.production` contain placeholders
+
+✅ **Server-Side Secrets:**
+- `DATABASE_URL` - Server-only (Prisma, API routes)
+- `NEXTAUTH_SECRET` - Server-only (JWT signing)
+- `AWS_SECRET_ACCESS_KEY` - Server-only (cloud operations)
+- Validated: No server secrets accessed in client components
+
+✅ **Client-Side Variables:**
+- Only `NEXT_PUBLIC_*` variables exposed to browser
+- Used for: public URLs, feature flags, analytics IDs
+- No sensitive data in client-exposed variables
+
+✅ **Multi-Environment Support:**
+- Development: `.env.development` (shared team config)
+- Staging: Secrets injected via GitHub Actions
+- Production: Secrets from AWS Secrets Manager
+- Local overrides: `.env.local` (developer-specific)
+
+✅ **Documentation:**
+- `.env.example` documents all variables with comments
+- README explains server vs client variable rules
+- Common pitfalls documented with examples
+
+### Verification & Testing
+
+**Verify Environment Setup:**
+```bash
+# Check all loaded variables (development)
+npm run verify:dev
+
+# Check staging configuration
+npm run verify:staging
+
+# Check production configuration
+npm run verify:prod
+```
+
+**Test Database Connection:**
+```bash
+# Verify DATABASE_URL is correctly configured
+npm run test:db
+
+# Expected output:
+# ✅ Environment: development
+# ✅ Database connection successful
+# ✅ Found X users in database
+```
+
+**Validate Variable Exposure:**
+```bash
+# Build and inspect client bundle
+npm run build
+# Check .next/static/chunks - search for "DATABASE_URL"
+# ✅ Should NOT appear (server-side only)
+# ✅ NEXT_PUBLIC_APP_URL SHOULD appear (client-side)
+```
+
+### Key Learnings
+
+- **Build-time embedding:** Environment variables are frozen at build time, requiring rebuild after changes
+- **NEXT_PUBLIC_ prefix:** Only way to expose variables to client-side; everything else stays server-only
+- **`.env.local` priority:** Highest priority, perfect for developer-specific overrides without affecting team
+- **Git safety:** Multiple layers of protection prevent accidental secret commits (.gitignore + .env.example template)
+- **Multi-environment:** Using `env-cmd` allows smooth switching between development/staging/production configs
+- **Documentation critical:** Clear `.env.example` with comments saves hours of onboarding confusion
+
+### Files Created/Modified
+
+- **Created:** `.env.local` - Personal local environment overrides (Git ignored)
+- **Enhanced:** `.env.example` - Comprehensive template with 150+ lines of documentation
+- **Verified:** `.gitignore` - Properly ignores all .env files except .env.example
+- **Existing:** `.env.development` - Team shared development configuration (active)
+- **Existing:** `.env.staging` - Staging environment configuration
+- **Existing:** `.env.production` - Production environment configuration
+- **Validated:** Server-side variable usage in `lib/db.js`, `prisma.config.ts` (secure)
+- **Validated:** No client-side exposure of server-only secrets (audit passed)
+
+---
+
