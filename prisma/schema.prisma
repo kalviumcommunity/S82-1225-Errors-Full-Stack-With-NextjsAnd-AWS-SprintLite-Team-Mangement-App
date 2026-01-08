@@ -9,36 +9,94 @@ datasource db {
   provider = "postgresql"
 }
 
-// Example models - customize based on your needs
+// User model - Authenticated users of the application
 model User {
   id        String   @id @default(cuid())
   email     String   @unique
-  name      String?
+  name      String
+  password  String   // Hashed password
+  role      String   @default("Member") // Owner, Admin, Member
+  avatar    String?  // Avatar URL or color
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  posts     Post[]
-  tasks     Task[]
+  
+  // Relations
+  createdTasks Task[]    @relation("TaskCreator")
+  assignedTasks Task[]   @relation("TaskAssignee")
+  comments     Comment[]
+  sessions     Session[]
 }
 
+// Task model - Core task entity with status and priority
+model Task {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  status      String   @default("Todo") // Todo, InProgress, Done
+  priority    String   @default("Medium") // Low, Medium, High
+  dueDate     DateTime?
+  
+  // Relations
+  creatorId   String
+  creator     User     @relation("TaskCreator", fields: [creatorId], references: [id], onDelete: Cascade)
+  
+  assigneeId  String?
+  assignee    User?    @relation("TaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  
+  comments    Comment[]
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([status])
+  @@index([priority])
+  @@index([assigneeId])
+  @@index([createdAt])
+}
+
+// Comment model - Activity feed for tasks
+model Comment {
+  id        String   @id @default(cuid())
+  content   String
+  
+  // Relations
+  taskId    String
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@index([taskId])
+  @@index([userId])
+}
+
+// Session model - User authentication sessions
+model Session {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  expiresAt DateTime
+  
+  // Relations
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@index([token])
+  @@index([userId])
+}
+
+// Legacy Post model - Can be removed if not needed
 model Post {
   id        String   @id @default(cuid())
   title     String
   content   String?
   published Boolean  @default(false)
   authorId  String
-  author    User     @relation(fields: [authorId], references: [id])
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-}
-
-model Task {
-  id          String   @id @default(cuid())
-  title       String
-  description String?
-  status      String   @default("pending")
-  priority    String   @default("medium")
-  userId      String
-  user        User     @relation(fields: [userId], references: [id])
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
 }
