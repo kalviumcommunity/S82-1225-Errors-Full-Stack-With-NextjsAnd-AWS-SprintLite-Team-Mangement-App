@@ -1679,16 +1679,16 @@ Author: @MOHIT
 Reviewers: @SAM (approved), @VIJAY (approved)
 
 Timeline:
-[Jan 8, 10:00] - Branch created, initial commit
-[Jan 8, 10:30] - PR opened with template filled
-[Jan 8, 10:35] - ✅ lint passed
-[Jan 8, 10:36] - ✅ type-check passed  
-[Jan 8, 10:38] - ✅ build passed
-[Jan 8, 11:00] - @SAM reviewed: "Great work! One suggestion..."
-[Jan 8, 11:15] - @MOHIT addressed feedback
-[Jan 8, 11:20] - @SAM approved
-[Jan 8, 11:30] - @VIJAY approved
-[Jan 8, 11:35] - Merged to main, branch deleted
+ - Branch created, initial commit
+ - PR opened with template filled
+ - ✅ lint passed
+ - ✅ type-check passed  
+ - ✅ build passed
+ - @SAM reviewed: "Great work! One suggestion..."
+ - @MOHIT addressed feedback
+ - @SAM approved
+ - @VIJAY approved
+ - Merged to main, branch deleted
 
 Stats:
 - 8 files changed
@@ -1777,6 +1777,191 @@ Failed CI/CD Runs: 4 (all fixed before merge)
 - Add danger.js for automated review comments
 - Set up GitHub Discussions for design proposals
 
----
+## SAM :-
+
+## SAM :- 
+I Collaborated with Mohit and we did the Docker Container Setup & Verification (SAM)
+
+**Branch:** DAY5-S/DOCKER  
+**Objective:** Build and verify Docker containerized deployment
+
+ -- Screen Shots :-
+   - ![alt text](image-1.png)
+   - ![alt text](image-2.png)
+
+### What Was Done
+
+#### 1. Container Build Process
+Successfully built and deployed a multi-container Docker setup with:
+- **Next.js Application** (sprintlite-app) - Port 3000
+- **PostgreSQL 16** (sprintlite-db) - Port 5432  
+- **Redis 7** (sprintlite-redis) - Port 6379
+
+**Build Metrics:**
+- Total build time: ~80 seconds
+- Final image size: ~450MB (multi-stage build optimization)
+- Build stages: 3 (deps → builder → runner)
+- Node.js version: 20-alpine
+- Build tool: Turbopack (Next.js 16.0.10)
+
+#### 2. Issues Encountered & Resolved
+
+**Issue #1: TypeScript Strict Configuration**
+```
+Error: 'AppRouteHandlerRoutes' is declared but its value is never used
+File: .next/dev/types/validator.ts
+```
+**Solution:** Modified `tsconfig.json` to disable `noUnusedLocals` and `noUnusedParameters` for Next.js internal type generation compatibility.
+
+**Issue #2: API Route Static Generation**
+```
+Error: Error fetching task summary during build
+Cause: Next.js trying to prerender API routes at build time
+```
+**Solution:** Added `export const dynamic = 'force-dynamic'` to:
+- `/app/api/tasks/summary/route.js`
+- `/app/api/test-db/route.js`
+
+**Issue #3: Prisma 7 Configuration**
+```
+Error: datasource.url property no longer supported in schema files
+```
+**Solution:** Updated `prisma.config.ts` to conditionally load `.env.development` only in non-production environments. In Docker, `DATABASE_URL` is provided via environment variables in `docker-compose.yml`.
+
+**Issue #4: Port Conflict**
+```
+Error: Bind for 0.0.0.0:3000 failed: port is already allocated
+```
+**Solution:** Identified conflicting container (`frontend` from another project), stopped it to free port 3000.
+
+#### 3. Database Setup
+
+**Prisma Schema Sync:**
+```bash
+docker exec sprintlite-app npx prisma db push --accept-data-loss
+```
+**Result:** ✅ Database synced successfully with 7 models (User, Task, Comment, Label, TaskLabel, Activity, Session)
+
+**Database Configuration:**
+- Host: postgres (Docker internal network)
+- Port: 5432
+- Database: sprintlite
+- User: sprintlite
+- Connection: Via DATABASE_URL environment variable
+
+#### 4. API Endpoint Testing
+
+**Test Results:**
+
+| Endpoint | Status | Response Time | Result |
+|----------|--------|---------------|--------|
+| `GET /api/test-db` | ✅ 200 OK | ~50ms | Database connected successfully |
+| `GET /api/tasks/summary` | ✅ 200 OK | ~120ms | `{"total":0,"pending":0,"inProgress":0,"completed":0}` |
+| `GET /api/tasks` | ⚠️ 500 Error | N/A | Code bug identified (using `user` instead of `creator`/`assignee`) |
+
+**Known Bug:** 
+- `/api/tasks` endpoint has a Prisma query error referencing non-existent field `user`
+- **Fix required:** Update `lib/tasks/index.js` to use correct relation names (`creator`, `assignee`)
+- Will be addressed in next iteration
+
+#### 5. Container Health Status
+
+**Current Running Containers:**
+```bash
+docker ps
+```
+```
+CONTAINER ID   IMAGE                 STATUS                   PORTS
+5f332f388c46   my-app-app           Up 5 minutes             0.0.0.0:3000->3000/tcp
+49630c502ef3   postgres:16-alpine   Up 5 minutes (healthy)   0.0.0.0:5432->5432/tcp
+288bf1e88165   redis:7-alpine       Up 5 minutes (healthy)   0.0.0.0:6379->6379/tcp
+```
+
+**Health Checks:**
+- PostgreSQL: `pg_isready -U sprintlite` ✅
+- Redis: `redis-cli ping` ✅
+- Next.js: Ready in 162ms ✅
+
+#### 6. Docker Configuration Files
+
+**Modified Files:**
+- `tsconfig.json` - Relaxed strict TypeScript rules for Docker build
+- `prisma.config.ts` - Conditional environment loading
+- `app/api/tasks/summary/route.js` - Added dynamic rendering
+- `app/api/test-db/route.js` - Added dynamic rendering
+
+**Existing Files (from DAY 3 - MOHIT):**
+- `Dockerfile` - Multi-stage build configuration
+- `docker-compose.yml` - Service orchestration
+- `.dockerignore` - Build context optimization
+
+### Verification Commands
+
+**Build containers:**
+```bash
+docker-compose up --build
+```
+
+**Check running services:**
+```bash
+docker ps
+```
+
+**View logs:**
+```bash
+docker logs sprintlite-app
+docker logs sprintlite-db
+docker logs sprintlite-redis
+```
+
+**Test database connection:**
+```bash
+curl http://localhost:3000/api/test-db
+```
+
+**Sync database schema:**
+```bash
+docker exec sprintlite-app npx prisma db push
+```
+
+### Key Learnings
+
+1. **Prisma 7 Breaking Changes:** Configuration moved from `schema.prisma` to `prisma.config.ts`, requiring environment-aware setup for Docker.
+
+2. **Next.js Build-time vs Runtime:** API routes with database calls must be marked as `dynamic` to prevent build-time execution errors.
+
+3. **TypeScript Strictness Trade-offs:** Strict unused variable checks can conflict with framework-generated code (Next.js internal types).
+
+4. **Multi-stage Docker Benefits:** 
+   - Reduced final image size (450MB vs potential 1.2GB)
+   - Faster rebuilds with layer caching
+   - Better security (separate build and runtime stages)
+
+5. **Docker Networking:** Services communicate via service names (e.g., `postgres:5432`, `redis:6379`) within Docker network.
+
+### Production Readiness Checklist
+
+✅ **Completed:**
+- [x] Multi-container setup with Docker Compose
+- [x] Health checks for PostgreSQL and Redis
+- [x] Environment variable configuration
+- [x] Database schema synced
+- [x] Multi-stage build optimization
+- [x] Non-root user for security (nextjs:nodejs uid 1001)
+- [x] Persistent volumes for data
+
+⏳ **Pending:**
+- [ ] Fix `/api/tasks` endpoint bug
+- [ ] Add nginx reverse proxy for production
+- [ ] Configure Docker secrets management
+- [ ] Set up container orchestration (future: Kubernetes/ECS)
+- [ ] Add monitoring and logging (future: Prometheus/Grafana)
+
+### Next Steps
+
+1. **Fix Code Bug:** Update `lib/tasks/index.js` to use correct Prisma relations
+2. **Rebuild Container:** Run `docker-compose up --build app` after fix
+3. **Full API Test Suite:** Test all endpoints once bug is fixed
+4. **AWS Preparation:** Begin EC2 setup for cloud deployment (DAY 6+)
 
 
