@@ -298,6 +298,8 @@ npm run test:db - Test database connection
 
 ---
 
+### DAY 3 :-
+ ## MOHIT :-
 ## Understanding Cloud Deployments: Docker → CI/CD → AWS/Azure
 
 ### Overview
