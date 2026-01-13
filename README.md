@@ -3621,5 +3621,579 @@ prisma.$use(async (params, next) => {
 - Migration: `add_indexes_for_optimisation`
 - Added 5 compound indexes to Task and Comment models
 
+---
+
+### DAY - 10 
+## MOHIT - RESTful API Architecture & Implementation
+
+### Quick Start Commands
+
+```bash
+# 1. Start development server
+npm run dev
+
+# 2. Test all API endpoints
+node scripts/test-api-endpoints.js
+
+# 3. Test individual endpoints with curl
+
+# Get all users with pagination
+curl "http://localhost:3000/api/users?page=1&limit=5"
+
+# Create a new user
+curl -X POST http://localhost:3000/api/users \
+  -H "Content-Type: application/json" \
+  -d '{"email":"newuser@example.com","name":"New User","password":"password123","role":"Member"}'
+
+# Get all tasks with filters
+curl "http://localhost:3000/api/tasks?status=InProgress&priority=High&page=1&limit=10"
+
+# Create a new task
+curl -X POST http://localhost:3000/api/tasks \
+  -H "Content-Type: application/json" \
+  -d '{"title":"API Task","description":"Created via API","status":"Todo","priority":"High","creatorId":"USER_ID"}'
+
+# Update a task
+curl -X PUT http://localhost:3000/api/tasks/TASK_ID \
+  -H "Content-Type: application/json" \
+  -d '{"status":"Done","priority":"Low"}'
+
+# Delete a task
+curl -X DELETE http://localhost:3000/api/tasks/TASK_ID
+```
+
+### Overview
+
+Implemented a complete RESTful API architecture following industry best practices with proper resource hierarchy, HTTP verb conventions, pagination, filtering, error handling, and comprehensive documentation.
+
+### API Folder Structure
+
+```
+app/api/
+├── users/
+│   ├── route.js              # GET, POST /api/users
+│   └── [id]/
+│       └── route.js          # GET, PUT, DELETE /api/users/:id
+├── tasks/
+│   ├── route.js              # GET, POST /api/tasks
+│   ├── [id]/
+│   │   └── route.js          # GET, PUT, DELETE /api/tasks/:id
+│   └── summary/
+│       └── route.js          # GET /api/tasks/summary
+├── comments/
+│   ├── route.js              # GET, POST /api/comments
+│   └── [id]/
+│       └── route.js          # GET, PUT, DELETE /api/comments/:id
+├── transactions/
+│   └── create-task/
+│       └── route.js          # POST, GET /api/transactions/create-task
+└── auth/
+    ├── login/
+    │   └── route.js          # POST /api/auth/login
+    ├── register/
+    │   └── route.js          # POST /api/auth/register
+    └── logout/
+        └── route.js          # POST /api/auth/logout
+```
+
+### RESTful Endpoints
+
+#### 1. Users API (`/api/users`)
+
+**GET /api/users**
+- Fetch all users with pagination and filtering
+- **Query Parameters:**
+  - `page` - Page number (default: 1)
+  - `limit` - Items per page (default: 10)
+  - `role` - Filter by role (Owner, Admin, Member)
+  - `search` - Search by name or email
+- **Response:**
+  ```json
+  {
+    "success": true,
+    "data": [...],
+    "pagination": {
+      "page": 1,
+      "limit": 10,
+      "total": 3,
+      "totalPages": 1,
+      "hasNextPage": false,
+      "hasPrevPage": false
+    }
+  }
+  ```
+
+**POST /api/users**
+- Create a new user
+- **Body:**
+  ```json
+  {
+    "email": "user@example.com",
+    "name": "User Name",
+    "password": "password123",
+    "role": "Member",
+    "avatar": "url"
+  }
+  ```
+- **Response:** `201 Created`
+
+**GET /api/users/:id**
+- Fetch single user with related data (tasks, comments, counts)
+- **Response:** User object with nested relations
+
+**PUT /api/users/:id**
+- Update user information
+- **Body:** `{ "name": "...", "role": "...", "avatar": "..." }`
+- **Response:** `200 OK`
+
+**DELETE /api/users/:id**
+- Delete user with cascade
+- **Response:** `200 OK` with deletion summary
+
+---
+
+#### 2. Tasks API (`/api/tasks`)
+
+**GET /api/tasks**
+- Fetch all tasks with pagination, filtering, and sorting
+- **Query Parameters:**
+  - `page` - Page number (default: 1)
+  - `limit` - Items per page (default: 10)
+  - `status` - Filter by status (Todo, InProgress, Done)
+  - `priority` - Filter by priority (Low, Medium, High)
+  - `assigneeId` - Filter by assigned user
+  - `creatorId` - Filter by creator
+  - `sortBy` - Sort field (createdAt, dueDate, priority)
+  - `sortOrder` - Sort direction (asc, desc)
+- **Response:**
+  ```json
+  {
+    "success": true,
+    "data": [...],
+    "pagination": { ... },
+    "filters": { "status": "InProgress", ... },
+    "sorting": { "sortBy": "createdAt", "sortOrder": "desc" }
+  }
+  ```
+
+**POST /api/tasks**
+- Create a new task
+- **Body:**
+  ```json
+  {
+    "title": "Task Title",
+    "description": "Description",
+    "status": "Todo",
+    "priority": "Medium",
+    "creatorId": "user-id",
+    "assigneeId": "user-id",
+    "dueDate": "2026-01-20T00:00:00Z"
+  }
+  ```
+- **Response:** `201 Created`
+
+**GET /api/tasks/:id**
+- Fetch single task with all related data (creator, assignee, comments)
+
+**PUT /api/tasks/:id**
+- Update task fields
+- **Body:** Any task fields to update
+- **Response:** `200 OK`
+
+**DELETE /api/tasks/:id**
+- Delete task with cascade to comments
+- **Response:** `200 OK` with deletion summary
+
+---
+
+#### 3. Comments API (`/api/comments`)
+
+**GET /api/comments**
+- Fetch all comments with pagination and filtering
+- **Query Parameters:**
+  - `page` - Page number
+  - `limit` - Items per page
+  - `taskId` - Filter by task
+  - `userId` - Filter by user
+- **Response:** Paginated comments with user and task info
+
+**POST /api/comments**
+- Create a new comment
+- **Body:**
+  ```json
+  {
+    "content": "Comment text",
+    "taskId": "task-id",
+    "userId": "user-id"
+  }
+  ```
+- **Response:** `201 Created`
+
+**GET /api/comments/:id**
+- Fetch single comment with relations
+
+**PUT /api/comments/:id**
+- Update comment content
+- **Body:** `{ "content": "Updated text" }`
+- **Response:** `200 OK`
+
+**DELETE /api/comments/:id**
+- Delete comment
+- **Response:** `200 OK`
+
+---
+
+### Pagination Implementation
+
+All collection endpoints support pagination:
+
+```javascript
+// Query parameters
+?page=2&limit=20
+
+// Response includes pagination metadata
+{
+  "success": true,
+  "data": [...],
+  "pagination": {
+    "page": 2,
+    "limit": 20,
+    "total": 45,
+    "totalPages": 3,
+    "hasNextPage": true,
+    "hasPrevPage": true
+  }
+}
+```
+
+**Implementation:**
+```javascript
+const page = Number(searchParams.get('page')) || 1;
+const limit = Number(searchParams.get('limit')) || 10;
+const skip = (page - 1) * limit;
+
+const [items, total] = await prisma.$transaction([
+  prisma.model.findMany({ skip, take: limit }),
+  prisma.model.count()
+]);
+
+const totalPages = Math.ceil(total / limit);
+```
+
+---
+
+### Filtering Implementation
+
+Multiple filters supported on relevant endpoints:
+
+**Users:**
+- `role` - Exact match (Owner, Admin, Member)
+- `search` - Case-insensitive search in name OR email
+
+**Tasks:**
+- `status` - Exact match (Todo, InProgress, Done)
+- `priority` - Exact match (Low, Medium, High)
+- `assigneeId` - Tasks assigned to specific user
+- `creatorId` - Tasks created by specific user
+
+**Example:**
+```bash
+# Get high-priority in-progress tasks
+curl "http://localhost:3000/api/tasks?status=InProgress&priority=High"
+
+# Search users by name
+curl "http://localhost:3000/api/users?search=John&role=Admin"
+```
+
+---
+
+### Sorting Implementation
+
+Tasks endpoint supports flexible sorting:
+
+```bash
+# Sort by creation date (newest first)
+?sortBy=createdAt&sortOrder=desc
+
+# Sort by due date (earliest first)
+?sortBy=dueDate&sortOrder=asc
+
+# Sort by priority
+?sortBy=priority&sortOrder=desc
+```
+
+**Implementation:**
+```javascript
+const sortBy = searchParams.get('sortBy') || 'createdAt';
+const sortOrder = searchParams.get('sortOrder') || 'desc';
+
+await prisma.task.findMany({
+  orderBy: { [sortBy]: sortOrder }
+});
+```
+
+---
+
+### Error Handling
+
+Comprehensive error responses with appropriate HTTP status codes:
+
+**400 Bad Request** - Validation errors
+```json
+{
+  "success": false,
+  "error": "Missing required fields",
+  "required": ["email", "name", "password"]
+}
+```
+
+**404 Not Found** - Resource doesn't exist
+```json
+{
+  "success": false,
+  "error": "User not found"
+}
+```
+
+**409 Conflict** - Unique constraint violation
+```json
+{
+  "success": false,
+  "error": "User with this email already exists"
+}
+```
+
+**500 Internal Server Error** - Server errors
+```json
+{
+  "success": false,
+  "error": "Failed to fetch users",
+  "message": "Detailed error message"
+}
+```
+
+**Error Handling Pattern:**
+```javascript
+try {
+  // Operation
+} catch (error) {
+  // Log error
+  console.error('Endpoint error:', error);
+  
+  // Handle specific Prisma errors
+  if (error.code === 'P2002') {
+    return NextResponse.json(
+      { success: false, error: 'Duplicate entry' },
+      { status: 409 }
+    );
+  }
+  
+  if (error.code === 'P2003') {
+    return NextResponse.json(
+      { success: false, error: 'Invalid foreign key' },
+      { status: 400 }
+    );
+  }
+  
+  // Generic error
+  return NextResponse.json(
+    { success: false, error: 'Operation failed' },
+    { status: 500 }
+  );
+}
+```
+
+---
+
+### Testing API Endpoints
+
+**Automated Test Script:**
+```bash
+node scripts/test-api-endpoints.js
+```
+
+**Output:**
+```
+🚀 Testing RESTful API Endpoints
+=======================================================================
+
+📋 USERS ENDPOINTS
+-----------------------------------------------------------------------
+1. Get all users with pagination
+GET http://localhost:3000/api/users?page=1&limit=5
+✅ 200 OK
+
+2. Create new user
+POST http://localhost:3000/api/users
+✅ 201 Created
+
+📝 TASKS ENDPOINTS
+-----------------------------------------------------------------------
+6. Get all tasks with pagination
+GET http://localhost:3000/api/tasks?page=1&limit=5
+✅ 200 OK
+
+💬 COMMENTS ENDPOINTS
+-----------------------------------------------------------------------
+11. Get all comments
+GET http://localhost:3000/api/comments?page=1&limit=5
+✅ 200 OK
+
+⚠️  ERROR HANDLING TESTS
+-----------------------------------------------------------------------
+15. Test 404 - Non-existent user
+GET http://localhost:3000/api/users/invalid-id
+❌ 404 Not Found
+
+✅ API Testing Complete!
+```
+
+---
+
+### REST Conventions & Naming
+
+**1. Resource Naming:**
+- ✅ **Plural nouns** for collections: `/users`, `/tasks`, `/comments`
+- ✅ **Lowercase** with hyphens for multi-word: `/task-templates`
+- ✅ **Hierarchical** for nested resources: `/tasks/:id/comments`
+
+**2. HTTP Verb Usage:**
+- `GET` - Retrieve resources (safe, idempotent)
+- `POST` - Create new resources
+- `PUT` - Update existing resources (idempotent)
+- `DELETE` - Remove resources (idempotent)
+
+**3. Status Code Conventions:**
+- `200 OK` - Successful GET, PUT, DELETE
+- `201 Created` - Successful POST
+- `400 Bad Request` - Validation error
+- `404 Not Found` - Resource doesn't exist
+- `409 Conflict` - Unique constraint violation
+- `500 Internal Server Error` - Server error
+
+**4. Response Structure:**
+```javascript
+// Success response
+{
+  "success": true,
+  "data": { ... },
+  "message": "Optional success message"
+}
+
+// Error response
+{
+  "success": false,
+  "error": "Human-readable error",
+  "message": "Technical details"
+}
+```
+
+---
+
+### Why Consistent API Structure Matters
+
+#### 1. **Predictability**
+Developers can guess endpoint patterns:
+- "If `/users/:id` works, `/tasks/:id` probably does too"
+- Query parameters work the same across all endpoints
+- Error responses have consistent structure
+
+#### 2. **Maintainability**
+- Adding new resources follows established patterns
+- Code duplication reduced through consistent structure
+- Easier to onboard new team members
+
+#### 3. **Scalability**
+- API Gateway integration simplified
+- Rate limiting can target resource patterns
+- Caching strategies apply uniformly
+
+#### 4. **Documentation**
+- Auto-generated docs become more accurate
+- Less explanation needed for similar endpoints
+- Swagger/OpenAPI schemas easier to maintain
+
+#### 5. **Client Development**
+- Frontend developers write less API-specific code
+- Generic API client functions work across resources
+- TypeScript types can be auto-generated
+
+#### 6. **Testing**
+- Test patterns reusable across endpoints
+- Integration tests more systematic
+- API contract validation simplified
+
+---
+
+### Reflection: RESTful Design Benefits
+
+**Problem Solved:**
+Before implementing REST conventions, our API had:
+- Inconsistent naming (some plural, some singular)
+- Mixed response formats
+- Unpredictable error handling
+- No pagination or filtering standards
+
+**After Implementation:**
+- ✅ **Uniform Structure:** All endpoints follow same patterns
+- ✅ **Self-Documenting:** URL structure explains functionality
+- ✅ **Scalable:** Easy to add new resources without rework
+- ✅ **Team-Friendly:** Clear conventions reduce confusion
+- ✅ **Client-Friendly:** Predictable responses simplify integration
+
+**Key Learnings:**
+1. **Consistency > Perfection:** Better to have consistent "good enough" conventions than perfect but inconsistent APIs
+2. **Plan for Pagination Early:** Retrofitting pagination is painful
+3. **Error Responses Matter:** Clients need actionable error messages
+4. **Documentation = Code:** Well-named endpoints reduce docs needed
+5. **Test Everything:** Automated tests catch convention violations
+
+**Future Improvements:**
+- Add API versioning (`/api/v1/users`)
+- Implement rate limiting per endpoint
+- Add request/response compression
+- OpenAPI/Swagger documentation
+- API key authentication
+- WebSocket support for real-time updates
+
+---
+
+### Implementation Summary
+
+✅ **RESTful Structure:** 3 main resources (users, tasks, comments) with full CRUD  
+✅ **HTTP Verbs:** GET, POST, PUT, DELETE properly implemented  
+✅ **Pagination:** All collection endpoints support page/limit  
+✅ **Filtering:** Resource-specific filters (status, priority, role, search)  
+✅ **Sorting:** Flexible sorting with sortBy/sortOrder  
+✅ **Error Handling:** Comprehensive with proper status codes  
+✅ **Validation:** Required field checking and enum validation  
+✅ **Testing:** Automated test script covering all endpoints  
+✅ **Documentation:** Complete API reference in README  
+✅ **Naming Conventions:** Consistent plural resource names  
+✅ **Response Format:** Standardized success/error structure  
+
+**Files Created/Modified:**
+- ✅ `app/api/users/route.js` - Users collection endpoint
+- ✅ `app/api/users/[id]/route.js` - Single user endpoint
+- ✅ `app/api/tasks/route.js` - Tasks collection endpoint (enhanced)
+- ✅ `app/api/tasks/[id]/route.js` - Single task endpoint
+- ✅ `app/api/comments/route.js` - Comments collection endpoint
+- ✅ `app/api/comments/[id]/route.js` - Single comment endpoint
+- ✅ `scripts/test-api-endpoints.js` - Automated API testing
+
+**Total Endpoints:** 15
+- Users: 5 endpoints (GET, POST, GET/:id, PUT/:id, DELETE/:id)
+- Tasks: 5 endpoints (GET, POST, GET/:id, PUT/:id, DELETE/:id)
+- Comments: 5 endpoints (GET, POST, GET/:id, PUT/:id, DELETE/:id)
+
+**Ready for Video Demo:**
+- All endpoints tested and working
+- Pagination and filtering demonstrated
+- Error handling validated
+- cURL commands documented
+
+
+
+
 
 
