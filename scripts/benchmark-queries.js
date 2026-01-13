@@ -41,7 +41,7 @@ function log(message, color = "reset") {
   console.log(`${colors[color]}${message}${colors.reset}`);
 }
 
-function logBenchmark(title, beforeMs, afterMs, improvement) {
+function logBenchmark(title, beforeMs, afterMs) {
   const improvementPercent = (((beforeMs - afterMs) / beforeMs) * 100).toFixed(1);
   log(`\n${"=".repeat(60)}`, "cyan");
   log(`${title}`, "bold");
