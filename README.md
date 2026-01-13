@@ -2181,7 +2181,160 @@ const session = await prisma.session.findUnique({
 - **Partitioning:** Time-based partitioning on `createdAt` for Task/Comment tables (when > 1M records)
 - **Full-Text Search:** Add `tsvector` column for task title/description search (PostgreSQL FTS)
 
-### Seed Data
+### DAY - 8
+## MOHIT -  Seed Data Script :-
+
+#### Seed Script Configuration
+
+**File:** `prisma/seed.mjs` (ES Module format for modern import syntax)
+
+**Package.json Configuration:**
+```json
+{
+  "scripts": {
+    "db:seed": "node prisma/seed.mjs"
+  },
+  "prisma": {
+    "seed": "node prisma/seed.mjs"
+  }
+}
+```
+
+#### Seed Script Structure
+
+**Complete Seed Script:**
+```javascript
+// prisma/seed.mjs
+import dotenv from 'dotenv';
+dotenv.config({ path: '.env.local' });
+
+import { PrismaClient } from '@prisma/client';
+import { PrismaPg } from '@prisma/adapter-pg';
+import pkg from 'pg';
+const { Pool } = pkg;
+import bcrypt from 'bcryptjs';
+
+const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+const adapter = new PrismaPg(pool);
+const prisma = new PrismaClient({ adapter });
+
+async function main() {
+  console.log('🌱 Starting database seed...\n');
+
+  // Clean existing data (development only)
+  await prisma.comment.deleteMany();
+  await prisma.task.deleteMany();
+  await prisma.session.deleteMany();
+  await prisma.user.deleteMany();
+
+  // Hash password once for all users
+  const hashedPassword = await bcrypt.hash('password123', 10);
+
+  // Create 3 users with different roles
+  const mohit = await prisma.user.create({
+    data: {
+      email: 'mohit@sprintlite.com',
+      name: 'Mohit Kumar Samal',
+      password: hashedPassword,
+      role: 'Owner',
+      avatar: '#3B82F6'
+    }
+  });
+
+  // Create 6 tasks with realistic data
+  const task1 = await prisma.task.create({
+    data: {
+      title: 'Setup Docker containers',
+      description: 'Configure Docker Compose...',
+      status: 'Done',
+      priority: 'High',
+      creatorId: mohit.id,
+      assigneeId: sam.id
+    }
+  });
+
+  // Create 5 comments for team discussions
+  await prisma.comment.create({
+    data: {
+      content: 'Docker containers running successfully!',
+      taskId: task1.id,
+      userId: sam.id
+    }
+  });
+
+  // Create 2 active sessions
+  await prisma.session.create({
+    data: {
+      token: 'session_token_mohit_' + Date.now(),
+      userId: mohit.id,
+      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000)
+    }
+  });
+
+  // Print summary
+  console.log('✅ Database seeded successfully!');
+}
+
+main()
+  .catch((error) => {
+    console.error('❌ Seed failed:', error);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await pool.end();
+    await prisma.$disconnect();
+  });
+```
+
+#### Running the Seed Script
+
+**Manual Execution:**
+```bash
+# Run seed script
+npm run db:seed
+
+# Output:
+🌱 Starting database seed...
+🧹 Cleaning existing data...
+✅ Cleaned existing data
+👥 Creating users...
+✅ Created 3 users
+📋 Creating tasks...
+✅ Created 6 tasks
+💬 Creating comments...
+✅ Created 5 comments
+🔐 Creating sessions...
+✅ Created 2 sessions
+
+📊 Seed Summary:
+================
+👥 Users: 3
+📋 Tasks: 6
+💬 Comments: 5
+🔐 Sessions: 2
+
+✅ Database seeded successfully!
+
+🔑 Test Login Credentials:
+   Email: mohit@sprintlite.com
+   Email: sam@sprintlite.com
+   Email: vijay@sprintlite.com
+   Password (all): password123
+```
+
+**Automatic Seeding After Migrations:**
+```bash
+# Reset database and automatically run seed
+npx prisma migrate reset
+
+# This runs:
+# 1. Drop database
+# 2. Create database
+# 3. Apply all migrations
+# 4. Run prisma.seed (from package.json)
+```
+
+#### Seed Data Content
 
 The database is populated with realistic sample data for testing:
 
@@ -2191,55 +2344,393 @@ The database is populated with realistic sample data for testing:
   email: 'mohit@sprintlite.com',
   name: 'Mohit Kumar Samal',
   role: 'Owner',
-  password: bcrypt.hash('password123')
+  password: bcrypt.hash('password123', 10),
+  avatar: '#3B82F6'  // Blue
 }
-// + sam@sprintlite.com (Admin)
-// + vijay@sprintlite.com (Member)
+{
+  email: 'sam@sprintlite.com',
+  name: 'Sam Wilson',
+  role: 'Admin',
+  password: bcrypt.hash('password123', 10),
+  avatar: '#10B981'  // Green
+}
+{
+  email: 'vijay@sprintlite.com',
+  name: 'Vijay Patel',
+  role: 'Member',
+  password: bcrypt.hash('password123', 10),
+  avatar: '#F59E0B'  // Orange
+}
 ```
 
-**Tasks (6):**
-- 2 Completed: "Setup Docker containers", "Update Prisma schema"
-- 2 In Progress: "Implement JWT authentication", "Fix task filtering bug"
-- 2 Todo: "Create API documentation", "Add Redis caching"
+**Tasks (6) - Full Workflow Coverage:**
+- ✅ **2 Done:** "Setup Docker containers", "Update Prisma schema"
+- 🔄 **2 InProgress:** "Implement JWT authentication", "Fix task filtering bug"
+- 📋 **2 Todo:** "Create API documentation", "Add Redis caching"
 
-**Comments (5):**
-- Realistic team discussions on tasks
-- Examples: "Docker containers are up and running successfully!", "Found the issue! The filter state wasn't being passed to the API query."
+**Comments (5) - Realistic Team Discussions:**
+- "Docker containers are up and running successfully! All health checks passing."
+- "Great work! Can you also add the docker-compose logs to the README?"
+- "Working on JWT implementation. Using jsonwebtoken library with RS256 algorithm."
+- "Found the issue! The filter state wasn't being passed to the API query. Fixing now."
+- "Documentation is looking good! Added schema diagrams and examples."
 
-**Sessions (2):**
-- Active sessions for mohit and sam (24-hour expiry)
+**Sessions (2) - Active Authentication:**
+- Mohit's session: `session_token_mohit_1736766234567` (expires in 24h)
+- Sam's session: `session_token_sam_1736766234568` (expires in 24h)
 
-**Seed Command:**
+**Test Credentials (All Users):**
+```
+Email: mohit@sprintlite.com | sam@sprintlite.com | vijay@sprintlite.com
+Password: password123
+```
+
+#### Idempotent Seed Best Practices
+
+**Current Approach (Development):**
+```javascript
+// Delete all data before seeding (fast, simple)
+await prisma.user.deleteMany();
+```
+
+**Production-Safe Approach (Recommended):**
+```javascript
+// Use upsert to prevent duplicates
+await prisma.user.upsert({
+  where: { email: 'mohit@sprintlite.com' },
+  update: {},  // Don't change if exists
+  create: {
+    email: 'mohit@sprintlite.com',
+    name: 'Mohit Kumar Samal',
+    // ... other fields
+  }
+});
+
+// Or check existence first
+const existingUser = await prisma.user.findUnique({
+  where: { email: 'mohit@sprintlite.com' }
+});
+
+if (!existingUser) {
+  await prisma.user.create({ data: userData });
+}
+```
+
+**Why Idempotency Matters:**
+- ✅ Can run seed multiple times safely
+- ✅ No duplicate data created
+- ✅ Useful for CI/CD test environments
+- ✅ Safe for staging environment resets
+
+#### Verifying Seed Data
+
+**Using Prisma Studio:**
 ```bash
-npm run db:seed
+npx prisma studio
+# Opens at http://localhost:5555
+
+# Navigate to tables:
+# - User: See 3 team members with roles
+# - Task: See 6 tasks with statuses
+# - Comment: See 5 discussions
+# - Session: See 2 active sessions
 ```
 
-**Test Credentials:**
-```
-Email: mohit@sprintlite.com
-Email: sam@sprintlite.com
-Email: vijay@sprintlite.com
-Password (all): password123
-```
-
-### Migration History
-
-#### Initial Schema Creation
+**Using Direct SQL:**
 ```bash
-npx prisma db push  # Sync schema to database without migration files
+# Connect to database
+docker exec -it sprintlite-db psql -U postgres -d neondb
+
+# Verify counts
+SELECT COUNT(*) as user_count FROM "User";       -- 3
+SELECT COUNT(*) as task_count FROM "Task";       -- 6
+SELECT COUNT(*) as comment_count FROM "Comment"; -- 5
+SELECT COUNT(*) as session_count FROM "Session"; -- 2
+
+# Check task distribution
+SELECT status, COUNT(*) 
+FROM "Task" 
+GROUP BY status;
+-- Done: 2, InProgress: 2, Todo: 2
+
+# Verify relationships
+SELECT 
+  t.title,
+  c.name as creator,
+  a.name as assignee
+FROM "Task" t
+JOIN "User" c ON t."creatorId" = c.id
+LEFT JOIN "User" a ON t."assigneeId" = a.id;
+```
+
+**Using API Endpoints:**
+```bash
+# Test summary endpoint
+curl http://localhost:3000/api/tasks/summary
+
+# Response:
+{
+  "data": {
+    "total": 6,
+    "pending": 2,
+    "inProgress": 2,
+    "completed": 2,
+    "completionRate": 33
+  }
+}
+```
+
+### Migration Workflow & History
+
+#### Understanding Prisma Migrations
+
+**Two Approaches:**
+
+**1. `prisma db push` (Development - What We Used):**
+- ✅ Fast prototyping without migration history
+- ✅ Good for rapid schema changes during development
+- ❌ No version control of database changes
+- ❌ Not suitable for production deployments
+- **Use case:** Early development, schema experimentation
+
+**2. `prisma migrate dev` (Production-Ready):**
+- ✅ Creates versioned migration files in `prisma/migrations/`
+- ✅ Git-trackable SQL migration history
+- ✅ Safe for production deployments
+- ✅ Enables rollback capabilities
+- **Use case:** After schema stabilizes, production deployments
+
+#### Our Migration History
+
+**Initial Schema Creation (Development):**
+```bash
+# Command used:
+npx prisma db push
+
+# Output:
+[dotenv@17.2.3] injecting env (4) from .env.development
+Loaded Prisma config from prisma.config.ts.
+Prisma schema loaded from prisma\schema.prisma.
+Datasource "db": PostgreSQL database "neondb", schema "public"
+
+Your database is now in sync with your Prisma schema. Done in 16.86s
 ```
 
 **Tables Created:**
-- `User` (5 indexes: email_unique, id_primary, 3 timestamp indexes)
-- `Task` (6 indexes: status, priority, assigneeId, createdAt, id_primary, creator FK)
-- `Comment` (4 indexes: taskId, userId, id_primary, 2 FK indexes)
-- `Session` (4 indexes: token_unique, userId, id_primary, user FK)
-- `Post` (1 index: id_primary) - Legacy, can be removed
+- `User` (5 fields, 1 unique index on email, 4 relations)
+- `Task` (8 fields, 4 indexes: status, priority, assigneeId, createdAt, 2 FK relations)
+- `Comment` (6 fields, 2 indexes: taskId, userId, 2 FK relations)
+- `Session` (5 fields, 2 indexes: token unique, userId, 1 FK relation)
+- `Post` (7 fields, 1 index) - Legacy model
 
 **Database Statistics:**
 - Total tables: 5
 - Total indexes: 19
-- Referential integrity: All foreign keys enforced with ON DELETE behaviors
+- Total foreign keys: 6
+- Referential integrity: All ON DELETE behaviors configured
+
+#### Migration Commands Reference
+
+**Creating New Migrations:**
+```bash
+# Create and apply migration after schema changes
+npx prisma migrate dev --name add_label_model
+npx prisma migrate dev --name add_priority_to_tasks
+npx prisma migrate dev --name create_activity_log
+
+# This will:
+# 1. Create prisma/migrations/<timestamp>_<name>/migration.sql
+# 2. Apply the migration to your development database
+# 3. Regenerate Prisma Client
+```
+
+**Viewing Migration Status:**
+```bash
+# Check which migrations are applied
+npx prisma migrate status
+
+# Example output:
+# ✅ 20260108120000_init_schema
+# ✅ 20260109140000_add_labels
+# ⏳ 20260110160000_add_activity_log (pending)
+```
+
+**Applying Pending Migrations:**
+```bash
+# In production, apply all pending migrations
+npx prisma migrate deploy
+
+# This will:
+# - Apply ONLY new migrations (doesn't modify existing)
+# - Doesn't generate Prisma Client (do separately)
+# - Safe for CI/CD pipelines
+```
+
+**Resetting Database (Development Only):**
+```bash
+# ⚠️ DESTRUCTIVE - Drops all data and reapplies migrations
+npx prisma migrate reset
+
+# This will:
+# 1. Drop the database
+# 2. Create new database
+# 3. Apply all migrations in order
+# 4. Run seed script (if configured)
+
+# Confirm prompt: "Are you sure you want to reset your database?"
+```
+
+**Resolving Migration Conflicts:**
+```bash
+# If local schema differs from migration history
+npx prisma migrate resolve --applied <migration_name>   # Mark as applied
+npx prisma migrate resolve --rolled-back <migration_name>  # Mark as rolled back
+
+# Example:
+npx prisma migrate resolve --applied 20260108120000_init_schema
+```
+
+#### Rollback Strategy
+
+**Option 1: Revert Specific Migration (Manual):**
+```bash
+# 1. Find the migration to rollback
+cd prisma/migrations
+ls  # Find timestamp_name folder
+
+# 2. Create rollback migration
+npx prisma migrate dev --name rollback_add_labels
+
+# 3. Manually edit migration.sql to reverse changes:
+# Example - If original added a column:
+# Original: ALTER TABLE "Task" ADD COLUMN "labelId" TEXT;
+# Rollback: ALTER TABLE "Task" DROP COLUMN "labelId";
+```
+
+**Option 2: Reset to Previous State:**
+```bash
+# ⚠️ DESTRUCTIVE - Only for development
+npx prisma migrate reset
+
+# Then restore from backup (see Production Safety below)
+```
+
+**Option 3: Production Rollback (Safest):**
+```sql
+-- Run SQL transaction manually:
+BEGIN;
+  -- Reverse migration changes here
+  ALTER TABLE "Task" DROP COLUMN "newColumn";
+COMMIT;
+
+-- Then mark migration as rolled back:
+npx prisma migrate resolve --rolled-back 20260110160000_add_column
+```
+
+#### Production Data Protection
+
+**1. Pre-Migration Backups:**
+```bash
+# PostgreSQL backup before migration
+pg_dump -h localhost -U sprintlite -d sprintlite > backup_$(date +%Y%m%d_%H%M%S).sql
+
+# Restore if needed:
+psql -h localhost -U sprintlite -d sprintlite < backup_20260113_120000.sql
+```
+
+**2. Staging Environment Testing:**
+```bash
+# 1. Apply migration to staging database first
+export DATABASE_URL="postgresql://staging..."
+npx prisma migrate deploy
+
+# 2. Run integration tests on staging
+npm run test:integration
+
+# 3. If successful, deploy to production
+export DATABASE_URL="postgresql://production..."
+npx prisma migrate deploy
+```
+
+**3. Zero-Downtime Migrations:**
+```sql
+-- Example: Adding non-nullable column safely
+
+-- Step 1: Add column as nullable (deploy 1)
+ALTER TABLE "Task" ADD COLUMN "priority" TEXT;
+
+-- Step 2: Backfill data (deploy 2)
+UPDATE "Task" SET "priority" = 'Medium' WHERE "priority" IS NULL;
+
+-- Step 3: Add NOT NULL constraint (deploy 3)
+ALTER TABLE "Task" ALTER COLUMN "priority" SET NOT NULL;
+```
+
+**4. Migration Monitoring:**
+```javascript
+// lib/db.js - Add query logging for production
+const prisma = new PrismaClient({
+  log: [
+    { level: 'query', emit: 'event' },
+    { level: 'error', emit: 'stdout' },
+  ],
+});
+
+prisma.$on('query', (e) => {
+  if (e.duration > 1000) {
+    console.warn(`Slow query (${e.duration}ms): ${e.query}`);
+  }
+});
+```
+
+**5. Idempotent Seed Scripts:**
+```javascript
+// prisma/seed.mjs - Safe re-running
+async function main() {
+  // Use upsert instead of create to prevent duplicates
+  await prisma.user.upsert({
+    where: { email: 'mohit@sprintlite.com' },
+    update: {},  // Don't modify if exists
+    create: {
+      email: 'mohit@sprintlite.com',
+      name: 'Mohit Kumar Samal',
+      password: hashedPassword,
+      role: 'Owner'
+    }
+  });
+}
+```
+
+#### Why Our Design Protects Data
+
+**1. Cascade Behaviors Prevent Orphans:**
+```prisma
+// When user is deleted, all their data cleaned up automatically
+user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+// When task assignee is deleted, task remains but assignee nullified
+assignee User? @relation(fields: [assigneeId], references: [id], onDelete: SetNull)
+```
+
+**2. Transactions for Atomic Operations:**
+```javascript
+// All-or-nothing: either all succeed or none
+await prisma.$transaction([
+  prisma.task.create({ data: taskData }),
+  prisma.comment.create({ data: commentData }),
+  prisma.activity.create({ data: activityData })
+]);
+```
+
+**3. Foreign Key Constraints:**
+- ✅ Cannot create Task with non-existent userId
+- ✅ Cannot delete User if Tasks reference them (with Cascade)
+- ✅ Database enforces referential integrity
+
+**4. Unique Constraints:**
+- ✅ Email addresses are unique (no duplicate accounts)
+- ✅ Session tokens are unique (no token collision)
+- ✅ Database prevents duplicates at schema level
 
 ### Viewing Database
 
@@ -2477,657 +2968,4 @@ prisma.user.findUnique({
   include: { createdTasks: true, assignedTasks: true } 
 })
 ```
-
----
-### DAY - 8 
-## MOHIT - Database Seeding & Seed Script
-
-### Commands
-
-```bash
-# Run seed script
-npm run db:seed
-
-# Or directly with node
-node prisma/seed.mjs
-
-# Verify data in Prisma Studio
-npx prisma studio
-
-# Check database sync
-npx prisma db push
-```
-
-### Seed Script Implementation
-
-**File:** `prisma/seed.mjs`
-
-The seed script populates the database with realistic sample data for development and testing:
-
-**Content:**
-- **3 Users:** Mohit (Owner), Sam (Admin), Vijay (Member)
-- **6 Tasks:** Mix of statuses (Todo, InProgress, Done) and priorities
-- **5 Comments:** Activity logs on various tasks
-- **2 Sessions:** Active user sessions with 24-hour expiry
-
-**Key Features:**
-- ✅ ES6 module syntax (`.mjs` extension)
-- ✅ Password hashing with bcryptjs (10 rounds)
-- ✅ Idempotent cleanup (deleteMany before seeding)
-- ✅ Proper error handling with try/catch/finally
-- ✅ Connection cleanup (pool.end() and prisma.$disconnect())
-- ✅ Test credentials: All users use password `password123`
-
-**Execution Output:**
-```
-🌱 Starting database seed...
-🧹 Cleaning existing data...
-✅ Cleaned existing data
-
-👥 Creating users...
-✅ Created 3 users
-
-📋 Creating tasks...
-✅ Created 6 tasks
-
-💬 Creating comments...
-✅ Created 5 comments
-
-🔐 Creating sessions...
-✅ Created 2 sessions
-
-📊 Seed Summary:
-================
-👥 Users: 3
-📋 Tasks: 6
-💬 Comments: 5
-🔐 Sessions: 2
-
-✅ Database seeded successfully!
-
-🔑 Test Login Credentials:
-   Email: mohit@sprintlite.com
-   Email: sam@sprintlite.com
-   Email: vijay@sprintlite.com
-   Password (all): password123
-```
-
-### Database Verification
-
-**Prisma Studio Access:**
-```bash
-npx prisma studio --browser none
-# Opens at http://localhost:51212
-```
-
-**Verification Queries:**
-```sql
--- User count
-SELECT COUNT(*) FROM "User";  -- Result: 3
-
--- Task distribution
-SELECT status, COUNT(*) FROM "Task" GROUP BY status;
--- Done: 2, InProgress: 2, Todo: 2
-
--- Comments with relationships
-SELECT c.content, u.name, t.title 
-FROM "Comment" c
-JOIN "User" u ON c."userId" = u.id
-JOIN "Task" t ON c."taskId" = t.id;
--- Returns 5 rows
-```
-
----
-### DAY - 9 
-## MOHIT - Database Optimization & Transactions
-
-### Quick Start Commands
-
-```bash
-# 1. Apply schema changes with compound indexes
-npx prisma db push
-
-# 2. Run transaction workflow tests
-node scripts/test-transactions-simple.js
-
-# 3. Run performance benchmarks
-node scripts/benchmark-queries.js
-
-# 4. Capture SQL query logs (with Prisma debugging)
-DEBUG="prisma:query" node scripts/benchmark-queries.js
-
-# 5. Get user IDs from database
-node scripts/get-user-ids.js
-
-# 6. Test transaction API endpoint (requires dev server running)
-# Terminal 1: npm run dev
-# Terminal 2: node scripts/test-transactions.js
-
-# 7. View optimization evidence
-cat OPTIMIZATION_EVIDENCE.md
-```
-
-### Overview
-
-This section documents the advanced database optimizations implemented to improve query performance, ensure data integrity through transactions, and prevent common anti-patterns. All optimizations have been benchmarked with measurable performance improvements.
-
-### Transaction Workflow Implementation
-
-#### Scenario: Atomic Task Creation
-
-When creating a new task, multiple operations must succeed together:
-1. **Create Task** - Insert task record
-2. **Create Initial Comment** - Add activity log
-3. **Update User Stats** - Track creator's task count
-
-All operations must complete successfully or all are rolled back to maintain data consistency.
-
-#### Implementation
-
-**File:** [app/api/transactions/create-task/route.js](app/api/transactions/create-task/route.js)
-
-```javascript
-// Transaction ensures all-or-nothing behavior
-const result = await prisma.$transaction(async (tx) => {
-  // Operation 1: Create task
-  const task = await tx.task.create({
-    data: {
-      title,
-      description,
-      status: 'Todo',
-      priority: 'Medium',
-      creatorId,
-      assigneeId,
-    },
-  });
-
-  // Operation 2: Create initial activity comment
-  const comment = await tx.comment.create({
-    data: {
-      content: `Task "${title}" has been created`,
-      taskId: task.id,
-      userId: creatorId,
-    },
-  });
-
-  // Operation 3: Fetch creator info
-  const creator = await tx.user.findUnique({
-    where: { id: creatorId },
-  });
-
-  return { task, comment, creator };
-});
-```
-
-#### Rollback Verification
-
-**Endpoint:** `GET /api/transactions/create-task?testRollback=true`
-
-This endpoint intentionally triggers a transaction failure to verify rollback behavior:
-
-```javascript
-await prisma.$transaction(async (tx) => {
-  // Create task (succeeds)
-  const task = await tx.task.create({ /* data */ });
-  
-  // Create comment (succeeds)
-  const comment = await tx.comment.create({ /* data */ });
-  
-  // Intentionally fail
-  throw new Error('ROLLBACK_TEST');
-});
-// ✅ Result: Both task and comment are rolled back
-// ✅ Database remains in consistent state
-```
-
-**Test Results:**
-- ✅ Transaction succeeds when all operations valid
-- ✅ Transaction rolls back when any operation fails
-- ✅ No partial writes in database
-- ✅ Foreign key constraints enforced atomically
-
-### Index Optimization
-
-#### Compound Indexes Added
-
-**1. Task Model Indexes**
-
-```prisma
-model Task {
-  // ... fields ...
-  
-  @@index([status])                 // Single-column index (existing)
-  @@index([priority])               // Single-column index (existing)
-  @@index([assigneeId])             // Single-column index (existing)
-  @@index([createdAt])              // Single-column index (existing)
-  @@index([status, createdAt])      // NEW: Compound for filtered sorts
-  @@index([assigneeId, status])     // NEW: Compound for user task filters
-  @@index([priority, dueDate])      // NEW: Compound for priority queries
-}
-```
-
-**2. Comment Model Indexes**
-
-```prisma
-model Comment {
-  // ... fields ...
-  
-  @@index([taskId])                 // Single-column index (existing)
-  @@index([userId])                 // Single-column index (existing)
-  @@index([taskId, createdAt])      // NEW: Task comments sorted by date
-  @@index([userId, createdAt])      // NEW: User activity feed
-}
-```
-
-#### Why These Indexes?
-
-| Index | Query Pattern | Benefit |
-|-------|--------------|---------|
-| `[status, createdAt]` | `WHERE status = 'Todo' ORDER BY createdAt DESC` | Avoids separate sort operation |
-| `[assigneeId, status]` | `WHERE assigneeId = X AND status = 'InProgress'` | Single index scan instead of merge |
-| `[priority, dueDate]` | `WHERE priority = 'High' ORDER BY dueDate` | Priority tasks sorted by deadline |
-| `[taskId, createdAt]` | `WHERE taskId = X ORDER BY createdAt DESC` | Comment timeline efficient |
-| `[userId, createdAt]` | `WHERE userId = X ORDER BY createdAt DESC` | User activity feed fast |
-
-#### Migration Applied
-
-```bash
-npx prisma migrate dev --name add_indexes_for_optimisation
-```
-
-### Query Pattern Optimizations
-
-#### File Structure
-
-- **Optimization Library:** [lib/tasks/optimized-queries.js](lib/tasks/optimized-queries.js)
-- **Benchmark Script:** [scripts/benchmark-queries.js](scripts/benchmark-queries.js)
-
-#### 1. SELECT Optimization (Reduce Data Transfer)
-
-**❌ Anti-Pattern: Over-fetching**
-```javascript
-// BAD: Fetches ALL fields including password hash
-const users = await prisma.user.findMany();
-// Returns: id, email, name, password, role, avatar, createdAt, updatedAt
-```
-
-**✅ Optimized: Select only needed fields**
-```javascript
-// GOOD: Fetches only required fields
-const users = await prisma.user.findMany({
-  select: {
-    id: true,
-    name: true,
-    email: true,
-    role: true,
-    avatar: true,
-  },
-});
-// Reduces data transfer by ~40% (no password, updatedAt)
-```
-
-**Performance Improvement:** 30-50% faster, less network bandwidth
-
----
-
-#### 2. N+1 Query Problem (JOIN Optimization)
-
-**❌ Anti-Pattern: N+1 Queries**
-```javascript
-// BAD: 1 query for tasks + N queries for comments
-const tasks = await prisma.task.findMany({ take: 10 });
-
-const tasksWithComments = await Promise.all(
-  tasks.map(async (task) => {
-    const comments = await prisma.comment.findMany({
-      where: { taskId: task.id },
-    });
-    return { ...task, comments };
-  })
-);
-// 11 total queries for 10 tasks!
-```
-
-**✅ Optimized: Single query with include**
-```javascript
-// GOOD: Single query with JOIN
-const tasks = await prisma.task.findMany({
-  take: 10,
-  include: {
-    comments: {
-      select: {
-        id: true,
-        content: true,
-        createdAt: true,
-        user: {
-          select: { name: true, avatar: true },
-        },
-      },
-    },
-    assignee: {
-      select: { name: true, email: true },
-    },
-  },
-});
-// 1 total query with JOINs
-```
-
-**Performance Improvement:** 60-80% faster, leverages `@@index([taskId])`
-
----
-
-#### 3. Cursor-Based Pagination (Scalability)
-
-**✅ Efficient Pagination for Large Datasets**
-```javascript
-// Cursor-based pagination scales better than offset
-const tasks = await prisma.task.findMany({
-  take: 20,
-  skip: cursor ? 1 : 0,
-  cursor: cursor ? { id: cursor } : undefined,
-  orderBy: { createdAt: 'desc' },
-});
-
-const nextCursor = tasks.length === 20 
-  ? tasks[tasks.length - 1].id 
-  : null;
-```
-
-**Benefits:**
-- ✅ Constant time complexity O(1) vs offset O(n)
-- ✅ Works with millions of records
-- ✅ No "skipping" of rows in database
-
----
-
-#### 4. Compound Index Usage (Multiple Filters)
-
-**✅ Leverages `@@index([status, createdAt])`**
-```javascript
-// Query uses compound index efficiently
-const tasks = await prisma.task.findMany({
-  where: { status: 'InProgress' },
-  orderBy: { createdAt: 'desc' },
-  take: 20,
-});
-// PostgreSQL uses [status, createdAt] index for both filter AND sort
-```
-
-**✅ Leverages `@@index([assigneeId, status])`**
-```javascript
-// User's in-progress tasks
-const tasks = await prisma.task.findMany({
-  where: {
-    assigneeId: userId,
-    status: 'InProgress',
-  },
-});
-// Single index scan, no merge required
-```
-
----
-
-#### 5. Bulk Operations (createMany vs Multiple Creates)
-
-**❌ Anti-Pattern: Loop with create()**
-```javascript
-// BAD: Multiple round trips to database
-for (const commentData of comments) {
-  await prisma.comment.create({ data: commentData });
-}
-// 10 comments = 10 separate INSERT queries
-```
-
-**✅ Optimized: createMany() bulk insert**
-```javascript
-// GOOD: Single bulk INSERT
-const result = await prisma.comment.createMany({
-  data: comments,
-  skipDuplicates: true,
-});
-// 10 comments = 1 query with 10 rows
-```
-
-**Performance Improvement:** 5-10x faster for bulk inserts
-
----
-
-#### 6. Parallel Aggregations (Dashboard Stats)
-
-**✅ Run multiple counts in parallel**
-```javascript
-// All queries run simultaneously in transaction
-const [totalTasks, todoTasks, inProgressTasks, doneTasks] = 
-  await prisma.$transaction([
-    prisma.task.count({ where: { assigneeId: userId } }),
-    prisma.task.count({ where: { assigneeId: userId, status: 'Todo' } }),
-    prisma.task.count({ where: { assigneeId: userId, status: 'InProgress' } }),
-    prisma.task.count({ where: { assigneeId: userId, status: 'Done' } }),
-  ]);
-// 4 queries run in parallel, total time = slowest query
-```
-
-**Benefits:**
-- ✅ All indexes used: `[assigneeId]` and `[assigneeId, status]`
-- ✅ Parallel execution reduces total time
-- ✅ Single transaction ensures consistent snapshot
-
----
-
-### Performance Benchmarks
-
-#### Running Benchmarks
-
-```bash
-# With Prisma query logging
-DEBUG="prisma:query" node scripts/benchmark-queries.js
-
-# With detailed logs
-DEBUG="prisma:query,prisma:info" node scripts/benchmark-queries.js
-
-# Regular output
-node scripts/benchmark-queries.js
-```
-
-#### Benchmark Results
-
-**Test 1: SELECT Optimization**
-```
-❌ Unoptimized (all fields): 24ms
-✅ Optimized (select):       15ms
-📈 Improvement: 37.5% faster
-```
-
-**Test 2: N+1 Query Problem**
-```
-❌ N+1 Pattern (11 queries): 89ms
-✅ Optimized (1 query):      28ms
-📈 Improvement: 68.5% faster
-```
-
-**Test 3: Compound Index Usage**
-```
-✅ Status filter with index:  8ms
-✅ User tasks with compound:  6ms
-📈 Index scan vs full table scan: 10x faster
-```
-
-**Test 4: Cursor Pagination**
-```
-✅ Page 1 (cursor):  12ms
-✅ Page 2 (cursor):  11ms
-📈 Consistent performance at any offset
-```
-
-**Test 5: Bulk Operations**
-```
-❌ Loop create() x10:     145ms
-✅ createMany() x10:       28ms
-📈 Improvement: 5.2x faster
-```
-
-#### Evidence Screenshots
-
-**Before Optimization (N+1 Problem):**
-```sql
--- Prisma Query Log
-prisma:query SELECT * FROM "Task" LIMIT 10; (23ms)
-prisma:query SELECT * FROM "Comment" WHERE "taskId" = $1; (8ms)
-prisma:query SELECT * FROM "Comment" WHERE "taskId" = $2; (7ms)
-prisma:query SELECT * FROM "Comment" WHERE "taskId" = $3; (8ms)
-... (7 more queries)
--- Total: 11 queries, 89ms
-```
-
-**After Optimization (Single Query with JOIN):**
-```sql
--- Prisma Query Log
-prisma:query SELECT t.*, c.* FROM "Task" t 
-  LEFT JOIN "Comment" c ON c."taskId" = t.id
-  WHERE t.id IN (...) LIMIT 10; (28ms)
--- Total: 1 query, 28ms (68% faster)
-```
-
-**Compound Index Performance:**
-```sql
--- EXPLAIN ANALYZE output (PostgreSQL)
--> Index Scan using "Task_status_createdAt_idx" on Task
-   Index Cond: (status = 'InProgress')
-   Rows Removed by Index Cond: 0
-   Execution Time: 0.123ms
-
--- Without compound index (forcing seq scan)
--> Seq Scan on Task
-   Filter: (status = 'InProgress')
-   Rows Removed by Filter: 156
-   Execution Time: 3.456ms
--- 28x slower without index!
-```
-
----
-
-### Anti-Patterns Avoided
-
-| Anti-Pattern | Problem | Solution |
-|--------------|---------|----------|
-| **Over-fetching** | Fetching all columns when only few needed | Use `select` to specify fields |
-| **N+1 Queries** | Loop causing multiple DB calls | Use `include` or `join` for relations |
-| **Offset Pagination** | Slow with large offsets (`OFFSET 100000`) | Use cursor-based pagination |
-| **Missing Indexes** | Full table scans on filtered queries | Add compound indexes for common filters |
-| **Multiple Creates** | Bulk inserts in loops | Use `createMany()` for batches |
-| **Sequential Aggregations** | Dashboard stats fetched one by one | Use `$transaction` for parallel queries |
-| **No Transaction Wrapping** | Partial writes on failures | Wrap related ops in `$transaction` |
-
----
-
-### Production Monitoring Plan
-
-#### Metrics to Track
-
-**1. Query Performance (AWS RDS / Azure Database)**
-- **Slow Query Log** - Queries taking > 100ms
-- **Query Execution Time** - P50, P95, P99 latencies
-- **Index Usage** - Ensure indexes are being used (not seq scans)
-
-```sql
--- PostgreSQL monitoring query
-SELECT query, calls, mean_exec_time, max_exec_time
-FROM pg_stat_statements
-WHERE mean_exec_time > 100
-ORDER BY mean_exec_time DESC
-LIMIT 20;
-```
-
-**2. Database Connections**
-- **Active Connections** - Current open connections
-- **Connection Pool Utilization** - Percentage of pool in use
-- **Connection Wait Time** - Time waiting for available connection
-
-**3. Cache Hit Ratio**
-- **Redis Cache Hit Rate** - % of requests served from cache
-- **Query Result Caching** - Reduce repeated identical queries
-
-**4. Transaction Metrics**
-- **Transaction Success Rate** - % of transactions committed
-- **Transaction Rollback Rate** - % of transactions rolled back
-- **Transaction Duration** - Time to complete transactions
-
-**5. Error Tracking**
-- **Deadlock Frequency** - Concurrent transaction conflicts
-- **Constraint Violations** - FK/unique constraint failures
-- **Timeout Errors** - Queries exceeding timeout threshold
-
-#### Monitoring Tools
-
-**AWS CloudWatch (if using RDS):**
-```javascript
-// Custom CloudWatch metrics
-const AWS = require('aws-sdk');
-const cloudwatch = new AWS.CloudWatch();
-
-async function logQueryMetric(queryName, duration) {
-  await cloudwatch.putMetricData({
-    Namespace: 'SprintLite/Database',
-    MetricData: [{
-      MetricName: 'QueryDuration',
-      Value: duration,
-      Unit: 'Milliseconds',
-      Dimensions: [
-        { Name: 'QueryType', Value: queryName }
-      ],
-    }],
-  }).promise();
-}
-```
-
-**Prisma Middleware for Logging:**
-```javascript
-// Add to prisma client initialization
-prisma.$use(async (params, next) => {
-  const before = Date.now();
-  const result = await next(params);
-  const after = Date.now();
-  
-  console.log(`Query ${params.model}.${params.action} took ${after - before}ms`);
-  
-  // Alert on slow queries
-  if (after - before > 1000) {
-    console.error(`SLOW QUERY ALERT: ${params.model}.${params.action}`);
-    // Send to monitoring service (DataDog, New Relic, etc.)
-  }
-  
-  return result;
-});
-```
-
-**Recommended Alerting Thresholds:**
-- ⚠️ Warning: Query > 500ms
-- 🚨 Critical: Query > 2000ms
-- 🚨 Critical: Connection pool > 90% utilized
-- 🚨 Critical: Transaction rollback rate > 5%
-
----
-
-### Summary of Optimizations
-
-✅ **Transaction Workflow:** Atomic task creation with rollback verification  
-✅ **Compound Indexes:** 5 new indexes for filtered sorts and multi-column queries  
-✅ **SELECT Optimization:** Reduced data transfer by 30-50%  
-✅ **N+1 Elimination:** Solved with include/join (60-80% faster)  
-✅ **Cursor Pagination:** Scalable to millions of records  
-✅ **Bulk Operations:** 5x faster with createMany()  
-✅ **Parallel Queries:** Dashboard aggregations in single transaction  
-✅ **Benchmarks:** All optimizations measured with before/after timings  
-✅ **Monitoring Plan:** CloudWatch metrics and Prisma middleware ready  
-
-**Files Added:**
-- [app/api/transactions/create-task/route.js](app/api/transactions/create-task/route.js) - Transaction workflow endpoint
-- [lib/tasks/optimized-queries.js](lib/tasks/optimized-queries.js) - Optimization utilities
-- [scripts/benchmark-queries.js](scripts/benchmark-queries.js) - Performance benchmark script
-
-**Schema Changes:**
-- Migration: `add_indexes_for_optimisation`
-- Added 5 compound indexes to Task and Comment models
-
-
 
