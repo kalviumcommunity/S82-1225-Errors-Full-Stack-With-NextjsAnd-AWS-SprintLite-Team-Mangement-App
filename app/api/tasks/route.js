@@ -1,7 +1,8 @@
-import { NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import pkg from "pg";
+import { sendSuccess, sendError, handlePrismaError, ERROR_CODES } from "@/lib/responseHandler";
+
 const { Pool } = pkg;
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
@@ -84,38 +85,33 @@ export async function GET(request) {
 
     const totalPages = Math.ceil(total / limit);
 
-    return NextResponse.json({
-      success: true,
-      data: tasks,
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages,
-        hasNextPage: page < totalPages,
-        hasPrevPage: page > 1,
+    return sendSuccess(
+      {
+        tasks,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages,
+          hasNextPage: page < totalPages,
+          hasPrevPage: page > 1,
+        },
+        filters: {
+          status,
+          priority,
+          assigneeId,
+          creatorId,
+        },
+        sorting: {
+          sortBy,
+          sortOrder,
+        },
       },
-      filters: {
-        status,
-        priority,
-        assigneeId,
-        creatorId,
-      },
-      sorting: {
-        sortBy,
-        sortOrder,
-      },
-    });
+      "Tasks fetched successfully"
+    );
   } catch (error) {
     console.error("GET /api/tasks error:", error);
-    return NextResponse.json(
-      {
-        success: false,
-        error: "Failed to fetch tasks",
-        message: error.message,
-      },
-      { status: 500 }
-    );
+    return handlePrismaError(error);
   }
 }
 
@@ -147,40 +143,30 @@ export async function POST(request) {
 
     // Validation
     if (!title || !creatorId) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Missing required fields",
-          required: ["title", "creatorId"],
-        },
-        { status: 400 }
+      return sendError(
+        "Missing required fields: title, creatorId",
+        ERROR_CODES.MISSING_REQUIRED_FIELDS,
+        400,
+        { required: ["title", "creatorId"] }
       );
     }
 
     // Validate status
     const validStatuses = ["Todo", "InProgress", "Done"];
     if (status && !validStatuses.includes(status)) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Invalid status",
-          validValues: validStatuses,
-        },
-        { status: 400 }
-      );
+      return sendError("Invalid status value", ERROR_CODES.INVALID_INPUT, 400, {
+        validValues: validStatuses,
+        provided: status,
+      });
     }
 
     // Validate priority
     const validPriorities = ["Low", "Medium", "High"];
     if (priority && !validPriorities.includes(priority)) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Invalid priority",
-          validValues: validPriorities,
-        },
-        { status: 400 }
-      );
+      return sendError("Invalid priority value", ERROR_CODES.INVALID_INPUT, 400, {
+        validValues: validPriorities,
+        provided: priority,
+      });
     }
 
     // Create task
@@ -204,33 +190,10 @@ export async function POST(request) {
       },
     });
 
-    return NextResponse.json(
-      {
-        success: true,
-        message: "Task created successfully",
-        data: task,
-      },
-      { status: 201 }
-    );
+    return sendSuccess(task, "Task created successfully", 201);
   } catch (error) {
     console.error("POST /api/tasks error:", error);
-
-    // Handle foreign key constraint violations
-    if (error.code === "P2003") {
-      return NextResponse.json(
-        { success: false, error: "Invalid creatorId or assigneeId" },
-        { status: 400 }
-      );
-    }
-
-    return NextResponse.json(
-      {
-        success: false,
-        error: "Failed to create task",
-        message: error.message,
-      },
-      { status: 500 }
-    );
+    return handlePrismaError(error);
   }
 }
 
