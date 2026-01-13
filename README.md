@@ -3129,6 +3129,3 @@ prisma.$use(async (params, next) => {
 **Schema Changes:**
 - Migration: `add_indexes_for_optimisation`
 - Added 5 compound indexes to Task and Comment models
-
-
-
