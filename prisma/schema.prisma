@@ -52,6 +52,9 @@ model Task {
   @@index([priority])
   @@index([assigneeId])
   @@index([createdAt])
+  @@index([status, createdAt])  // Compound index for filtering by status and sorting by date
+  @@index([assigneeId, status]) // Compound index for user's tasks by status
+  @@index([priority, dueDate])  // Compound index for priority-based queries with due dates
 }
 
 // Comment model - Activity feed for tasks
@@ -71,6 +74,8 @@ model Comment {
   
   @@index([taskId])
   @@index([userId])
+  @@index([taskId, createdAt]) // Compound index for task comments sorted by date
+  @@index([userId, createdAt]) // Compound index for user's comments sorted by date
 }
 
 // Session model - User authentication sessions
