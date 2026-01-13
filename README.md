@@ -2479,9 +2479,106 @@ prisma.user.findUnique({
 ```
 
 ---
-### DAY 9 
-## MOHIT - Database Optimization & Transactions
-### DAY 9 - January 13, 2026
+### DAY - 8 
+## MOHIT - Database Seeding & Seed Script
+
+### Commands
+
+```bash
+# Run seed script
+npm run db:seed
+
+# Or directly with node
+node prisma/seed.mjs
+
+# Verify data in Prisma Studio
+npx prisma studio
+
+# Check database sync
+npx prisma db push
+```
+
+### Seed Script Implementation
+
+**File:** `prisma/seed.mjs`
+
+The seed script populates the database with realistic sample data for development and testing:
+
+**Content:**
+- **3 Users:** Mohit (Owner), Sam (Admin), Vijay (Member)
+- **6 Tasks:** Mix of statuses (Todo, InProgress, Done) and priorities
+- **5 Comments:** Activity logs on various tasks
+- **2 Sessions:** Active user sessions with 24-hour expiry
+
+**Key Features:**
+- ✅ ES6 module syntax (`.mjs` extension)
+- ✅ Password hashing with bcryptjs (10 rounds)
+- ✅ Idempotent cleanup (deleteMany before seeding)
+- ✅ Proper error handling with try/catch/finally
+- ✅ Connection cleanup (pool.end() and prisma.$disconnect())
+- ✅ Test credentials: All users use password `password123`
+
+**Execution Output:**
+```
+🌱 Starting database seed...
+🧹 Cleaning existing data...
+✅ Cleaned existing data
+
+👥 Creating users...
+✅ Created 3 users
+
+📋 Creating tasks...
+✅ Created 6 tasks
+
+💬 Creating comments...
+✅ Created 5 comments
+
+🔐 Creating sessions...
+✅ Created 2 sessions
+
+📊 Seed Summary:
+================
+👥 Users: 3
+📋 Tasks: 6
+💬 Comments: 5
+🔐 Sessions: 2
+
+✅ Database seeded successfully!
+
+🔑 Test Login Credentials:
+   Email: mohit@sprintlite.com
+   Email: sam@sprintlite.com
+   Email: vijay@sprintlite.com
+   Password (all): password123
+```
+
+### Database Verification
+
+**Prisma Studio Access:**
+```bash
+npx prisma studio --browser none
+# Opens at http://localhost:51212
+```
+
+**Verification Queries:**
+```sql
+-- User count
+SELECT COUNT(*) FROM "User";  -- Result: 3
+
+-- Task distribution
+SELECT status, COUNT(*) FROM "Task" GROUP BY status;
+-- Done: 2, InProgress: 2, Todo: 2
+
+-- Comments with relationships
+SELECT c.content, u.name, t.title 
+FROM "Comment" c
+JOIN "User" u ON c."userId" = u.id
+JOIN "Task" t ON c."taskId" = t.id;
+-- Returns 5 rows
+```
+
+---
+### DAY - 9 
 ## MOHIT - Database Optimization & Transactions
 
 ### Quick Start Commands
