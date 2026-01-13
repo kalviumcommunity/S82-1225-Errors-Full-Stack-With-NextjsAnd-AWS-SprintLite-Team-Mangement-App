@@ -3080,6 +3080,7 @@ async function logQueryMetric(queryName, duration) {
 }
 ```
 
+
 **Prisma Middleware for Logging:**
 ```javascript
 // Add to prisma client initialization
