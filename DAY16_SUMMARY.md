@@ -1,3 +1,7 @@
+
+### DAY 16 - MOHIT
+## Redis Caching Layer
+
 # DAY 16: Redis Caching Implementation
 
 ## Summary
@@ -127,3 +131,4 @@ For production deployment:
 ✅ No errors or warnings
 ✅ Performance validated
 ✅ Ready for review
+
