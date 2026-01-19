@@ -1,7 +1,8 @@
-import { NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import pkg from "pg";
+import { sendSuccess, sendError, handlePrismaError, ERROR_CODES } from "@/lib/responseHandler";
+
 const { Pool } = pkg;
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
@@ -69,28 +70,23 @@ export async function GET(request) {
 
     const totalPages = Math.ceil(total / limit);
 
-    return NextResponse.json({
-      success: true,
-      data: users,
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages,
-        hasNextPage: page < totalPages,
-        hasPrevPage: page > 1,
+    return sendSuccess(
+      {
+        users,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages,
+          hasNextPage: page < totalPages,
+          hasPrevPage: page > 1,
+        },
       },
-    });
+      "Users fetched successfully"
+    );
   } catch (error) {
     console.error("GET /api/users error:", error);
-    return NextResponse.json(
-      {
-        success: false,
-        error: "Failed to fetch users",
-        message: error.message,
-      },
-      { status: 500 }
-    );
+    return handlePrismaError(error);
   }
 }
 
@@ -112,20 +108,18 @@ export async function POST(request) {
 
     // Validation
     if (!email || !name || !password) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Missing required fields",
-          required: ["email", "name", "password"],
-        },
-        { status: 400 }
+      return sendError(
+        "Missing required fields: email, name, password",
+        ERROR_CODES.MISSING_REQUIRED_FIELDS,
+        400,
+        { required: ["email", "name", "password"] }
       );
     }
 
     // Email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
-      return NextResponse.json({ success: false, error: "Invalid email format" }, { status: 400 });
+      return sendError("Invalid email format", ERROR_CODES.INVALID_INPUT, 400);
     }
 
     // Check if user already exists
@@ -134,10 +128,7 @@ export async function POST(request) {
     });
 
     if (existingUser) {
-      return NextResponse.json(
-        { success: false, error: "User with this email already exists" },
-        { status: 409 }
-      );
+      return sendError("User with this email already exists", ERROR_CODES.USER_ALREADY_EXISTS, 409);
     }
 
     // Hash password
@@ -163,32 +154,9 @@ export async function POST(request) {
       },
     });
 
-    return NextResponse.json(
-      {
-        success: true,
-        message: "User created successfully",
-        data: user,
-      },
-      { status: 201 }
-    );
+    return sendSuccess(user, "User created successfully", 201);
   } catch (error) {
     console.error("POST /api/users error:", error);
-
-    // Handle Prisma unique constraint violation
-    if (error.code === "P2002") {
-      return NextResponse.json(
-        { success: false, error: "User with this email already exists" },
-        { status: 409 }
-      );
-    }
-
-    return NextResponse.json(
-      {
-        success: false,
-        error: "Failed to create user",
-        message: error.message,
-      },
-      { status: 500 }
-    );
+    return handlePrismaError(error);
   }
 }
