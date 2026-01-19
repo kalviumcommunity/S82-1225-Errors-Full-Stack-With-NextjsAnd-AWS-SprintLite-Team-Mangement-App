@@ -10,6 +10,8 @@ import {
   ERROR_CODES,
 } from "@/lib/responseHandler";
 import { createTaskSchema, taskQuerySchema } from "@/lib/schemas/taskSchema";
+import { handleError } from "@/lib/errorHandler";
+import { logRequest, logResponse } from "@/lib/logger";
 
 const { Pool } = pkg;
 
@@ -93,7 +95,7 @@ export async function GET(request) {
 
     const totalPages = Math.ceil(total / limit);
 
-    return sendSuccess(
+    const response = sendSuccess(
       {
         tasks,
         pagination: {
@@ -117,9 +119,11 @@ export async function GET(request) {
       },
       "Tasks fetched successfully"
     );
+
+    logResponse(request, response, 200);
+    return response;
   } catch (error) {
-    console.error("GET /api/tasks error:", error);
-    return handlePrismaError(error);
+    return handleError(error, "GET /api/tasks");
   }
 }
 
@@ -138,6 +142,8 @@ export async function GET(request) {
  */
 export async function POST(request) {
   try {
+    logRequest(request, "POST /api/tasks");
+
     const body = await request.json();
 
     // Validate request body with Zod
@@ -165,16 +171,11 @@ export async function POST(request) {
       },
     });
 
-    return sendSuccess(task, "Task created successfully", 201);
+    const response = sendSuccess(task, "Task created successfully", 201);
+    logResponse(request, response, 201);
+    return response;
   } catch (error) {
-    console.error("POST /api/tasks error:", error);
-
-    // Handle Zod validation errors
-    if (error instanceof ZodError) {
-      return handleZodError(error);
-    }
-
-    return handlePrismaError(error);
+    return handleError(error, "POST /api/tasks");
   }
 }
 

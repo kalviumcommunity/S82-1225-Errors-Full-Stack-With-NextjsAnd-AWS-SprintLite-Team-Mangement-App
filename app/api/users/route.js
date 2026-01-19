@@ -11,6 +11,8 @@ import {
 } from "@/lib/responseHandler";
 import { authenticateRequest } from "@/lib/auth";
 import { createUserSchema, userQuerySchema } from "@/lib/schemas/userSchema";
+import { handleError } from "@/lib/errorHandler";
+import { logRequest, logResponse } from "@/lib/logger";
 
 const { Pool } = pkg;
 
@@ -30,6 +32,8 @@ const prisma = new PrismaClient({ adapter });
  */
 export async function GET(request) {
   try {
+    logRequest(request, "GET /api/users");
+
     const authResult = authenticateRequest(request);
     if (authResult.errorResponse) {
       return authResult.errorResponse;
@@ -87,7 +91,7 @@ export async function GET(request) {
 
     const totalPages = Math.ceil(total / limit);
 
-    return sendSuccess(
+    const response = sendSuccess(
       {
         users,
         pagination: {
@@ -101,15 +105,11 @@ export async function GET(request) {
       },
       "Users fetched successfully"
     );
+
+    logResponse(request, response, 200);
+    return response;
   } catch (error) {
-    console.error("GET /api/users error:", error);
-
-    // Handle Zod validation errors
-    if (error instanceof ZodError) {
-      return handleZodError(error);
-    }
-
-    return handlePrismaError(error);
+    return handleError(error, "GET /api/users");
   }
 }
 
@@ -126,6 +126,8 @@ export async function GET(request) {
  */
 export async function POST(request) {
   try {
+    logRequest(request, "POST /api/users");
+
     const authResult = authenticateRequest(request);
     if (authResult.errorResponse) {
       return authResult.errorResponse;
@@ -169,15 +171,10 @@ export async function POST(request) {
       },
     });
 
-    return sendSuccess(user, "User created successfully", 201);
+    const response = sendSuccess(user, "User created successfully", 201);
+    logResponse(request, response, 201);
+    return response;
   } catch (error) {
-    console.error("POST /api/users error:", error);
-
-    // Handle Zod validation errors
-    if (error instanceof ZodError) {
-      return handleZodError(error);
-    }
-
-    return handlePrismaError(error);
+    return handleError(error, "POST /api/users");
   }
 }
