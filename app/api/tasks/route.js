@@ -1,7 +1,15 @@
 import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import pkg from "pg";
-import { sendSuccess, sendError, handlePrismaError, ERROR_CODES } from "@/lib/responseHandler";
+import { ZodError } from "zod";
+import {
+  sendSuccess,
+  sendError,
+  handlePrismaError,
+  handleZodError,
+  ERROR_CODES,
+} from "@/lib/responseHandler";
+import { createTaskSchema, taskQuerySchema } from "@/lib/schemas/taskSchema";
 
 const { Pool } = pkg;
 
@@ -131,43 +139,10 @@ export async function GET(request) {
 export async function POST(request) {
   try {
     const body = await request.json();
-    const {
-      title,
-      description,
-      status = "Todo",
-      priority = "Medium",
-      creatorId,
-      assigneeId,
-      dueDate,
-    } = body;
 
-    // Validation
-    if (!title || !creatorId) {
-      return sendError(
-        "Missing required fields: title, creatorId",
-        ERROR_CODES.MISSING_REQUIRED_FIELDS,
-        400,
-        { required: ["title", "creatorId"] }
-      );
-    }
-
-    // Validate status
-    const validStatuses = ["Todo", "InProgress", "Done"];
-    if (status && !validStatuses.includes(status)) {
-      return sendError("Invalid status value", ERROR_CODES.INVALID_INPUT, 400, {
-        validValues: validStatuses,
-        provided: status,
-      });
-    }
-
-    // Validate priority
-    const validPriorities = ["Low", "Medium", "High"];
-    if (priority && !validPriorities.includes(priority)) {
-      return sendError("Invalid priority value", ERROR_CODES.INVALID_INPUT, 400, {
-        validValues: validPriorities,
-        provided: priority,
-      });
-    }
+    // Validate request body with Zod
+    const validatedData = createTaskSchema.parse(body);
+    const { title, description, status, priority, creatorId, assigneeId, dueDate } = validatedData;
 
     // Create task
     const task = await prisma.task.create({
@@ -193,6 +168,12 @@ export async function POST(request) {
     return sendSuccess(task, "Task created successfully", 201);
   } catch (error) {
     console.error("POST /api/tasks error:", error);
+
+    // Handle Zod validation errors
+    if (error instanceof ZodError) {
+      return handleZodError(error);
+    }
+
     return handlePrismaError(error);
   }
 }
