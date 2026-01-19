@@ -6554,10 +6554,508 @@ JWT_EXPIRES_IN="1h"
 7. **HTTPS in production** — Prevent token interception
 8. **Validate on both sides** — Client for UX, server for security
 
+---
 
+### DAY 14 - MOHIT
+## Role-Based Access Control (RBAC) & Middleware
 
+### 📋 Overview
 
+Implemented comprehensive role-based access control (RBAC) system with middleware functions that validate JWT tokens and enforce role-based permissions across protected routes. Following the principle of least privilege, users only get access to resources appropriate for their role.
 
+**What was implemented:**
+- ✅ Role-based middleware helpers (`hasRole`, `requireRole`)
+- ✅ Admin-only API routes (`/api/admin`, `/api/admin/users`)
+- ✅ Three-tier role system (Owner, Admin, Member)
+- ✅ Least privilege enforcement
+- ✅ 403 Forbidden for insufficient permissions
+- ✅ Automated RBAC testing script
 
+---
 
+### 🎭 Role Hierarchy
 
+```
+┌─────────────────────────────────────────────────────┐
+│                      Owner                          │
+│  • Full system access                               │
+│  • Manage all users (create, update, delete)        │
+│  • Change user roles                                │
+│  • Access all admin endpoints                       │
+│  • View system statistics                           │
+└─────────────────────────────────────────────────────┘
+                        │
+                        │ inherits
+                        ▼
+┌─────────────────────────────────────────────────────┐
+│                      Admin                          │
+│  • Manage tasks and users (read, update)            │
+│  • View system statistics                           │
+│  • Access admin dashboard                           │
+│  • Cannot change user roles                         │
+│  • Cannot delete users                              │
+└─────────────────────────────────────────────────────┘
+                        │
+                        │ inherits
+                        ▼
+┌─────────────────────────────────────────────────────┐
+│                      Member                         │
+│  • Manage own tasks                                 │
+│  • View assigned tasks                              │
+│  • Comment on tasks                                 │
+│  • Update own profile                               │
+│  • No admin access                                  │
+└─────────────────────────────────────────────────────┘
+```
+
+---
+
+### 🔐 Middleware Logic Flow
+
+```
+                      ┌──────────────┐
+                      │   Request    │
+                      │  /api/admin  │
+                      └──────┬───────┘
+                             │
+                             ▼
+                  ┌──────────────────────┐
+                  │ Extract Authorization│
+                  │       Header         │
+                  └──────────┬───────────┘
+                             │
+                    ┌────────┴────────┐
+                    │ Header present? │
+                    └────────┬────────┘
+                             │
+                   ┌─────────┴──────────┐
+                  No                   Yes
+                   │                    │
+                   ▼                    ▼
+          ┌────────────────┐   ┌────────────────┐
+          │  401 Unauthorized │   │  Verify JWT    │
+          │  "Missing token"  │   │   Signature    │
+          └────────────────┘   └────────┬───────┘
+                                        │
+                               ┌────────┴────────┐
+                               │  Token valid?   │
+                               └────────┬────────┘
+                                        │
+                              ┌─────────┴──────────┐
+                             No                   Yes
+                              │                    │
+                              ▼                    ▼
+                     ┌────────────────┐   ┌────────────────┐
+                     │ 401 Unauthorized│   │  Decode Token  │
+                     │ "Invalid token" │   │  Extract Role  │
+                     └────────────────┘   └────────┬───────┘
+                                                   │
+                                          ┌────────┴────────┐
+                                          │ Has required    │
+                                          │     role?       │
+                                          └────────┬────────┘
+                                                   │
+                                         ┌─────────┴──────────┐
+                                        No                   Yes
+                                         │                    │
+                                         ▼                    ▼
+                                ┌────────────────┐   ┌────────────────┐
+                                │  403 Forbidden │   │  Allow Access  │
+                                │ "Access denied"│   │  Process Request│
+                                └────────────────┘   └────────────────┘
+```
+
+---
+
+### 📂 File Structure
+
+**Middleware/Auth Utilities**
+- [lib/auth.js](lib/auth.js) — Enhanced with `hasRole()` and `requireRole()` functions
+
+**Admin Routes**
+- [app/api/admin/route.js](app/api/admin/route.js) — Admin dashboard stats (Admin/Owner only)
+- [app/api/admin/users/route.js](app/api/admin/users/route.js) — User management (Admin/Owner)
+
+**Testing**
+- [scripts/test-rbac.js](scripts/test-rbac.js) — Automated RBAC testing
+
+---
+
+### 🛠 Implementation Details
+
+#### 1. Role Check Helper
+
+```javascript
+/**
+ * Check if user has required role
+ */
+export const hasRole = (user, allowedRoles) => {
+  if (!user || !user.role) return false;
+  
+  const roles = Array.isArray(allowedRoles) ? allowedRoles : [allowedRoles];
+  return roles.includes(user.role);
+};
+```
+
+**Usage:** Simple boolean check for role membership.
+
+---
+
+#### 2. Role-Based Middleware
+
+```javascript
+/**
+ * Authenticate and require specific role(s)
+ */
+export const requireRole = (request, allowedRoles) => {
+  // First authenticate
+  const authResult = authenticateRequest(request);
+  if (authResult.errorResponse) {
+    return authResult; // 401 if not authenticated
+  }
+
+  // Check role
+  if (!hasRole(authResult.user, allowedRoles)) {
+    return {
+      errorResponse: sendError(
+        "Access denied. Insufficient permissions.",
+        ERROR_CODES.FORBIDDEN,
+        403
+      ),
+    };
+  }
+
+  return { user: authResult.user };
+};
+```
+
+**Key features:**
+- Validates JWT first (authentication)
+- Then checks role (authorization)
+- Returns 401 for missing/invalid token
+- Returns 403 for insufficient permissions
+
+---
+
+#### 3. Admin Route Protection
+
+```javascript
+// app/api/admin/route.js
+export async function GET(request) {
+  // Require Admin or Owner role
+  const authResult = requireRole(request, ["Admin", "Owner"]);
+  if (authResult.errorResponse) {
+    return authResult.errorResponse;
+  }
+
+  // Admin logic here...
+  const stats = await fetchAdminStats();
+  return sendSuccess(stats, "Admin statistics fetched");
+}
+```
+
+**Single line of code** enforces role-based access!
+
+---
+
+#### 4. Owner-Only Actions
+
+```javascript
+// app/api/admin/route.js - Change user role
+export async function POST(request) {
+  // Only Owners can change roles
+  const authResult = requireRole(request, "Owner");
+  if (authResult.errorResponse) {
+    return authResult.errorResponse;
+  }
+
+  // Update user role...
+}
+```
+
+**Highest privilege level** for sensitive operations.
+
+---
+
+### 🧪 Testing RBAC
+
+Run the automated test script:
+
+```bash
+# Ensure dev server is running
+npm run dev
+
+# In another terminal
+node scripts/test-rbac.js
+```
+
+**Test scenarios:**
+1. ✅ Member user can access `/api/users`
+2. ✅ Member user denied access to `/api/admin` (403)
+3. ✅ Unauthenticated request denied (401)
+4. ✅ Member user denied access to `/api/admin/users` (403)
+
+---
+
+### 📝 API Examples
+
+#### ✅ Member Access to /api/users (Allowed)
+
+```bash
+curl -X GET http://localhost:3000/api/users \
+  -H "Authorization: Bearer <MEMBER_JWT>"
+```
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "message": "Users fetched successfully",
+  "data": {
+    "users": [...],
+    "pagination": {...}
+  }
+}
+```
+
+---
+
+#### ❌ Member Access to /api/admin (Denied)
+
+```bash
+curl -X GET http://localhost:3000/api/admin \
+  -H "Authorization: Bearer <MEMBER_JWT>"
+```
+
+**Response (403):**
+```json
+{
+  "success": false,
+  "message": "Access denied. Insufficient permissions.",
+  "error": {
+    "code": "E008"
+  },
+  "timestamp": "2026-01-19T12:00:00.000Z"
+}
+```
+
+---
+
+#### ✅ Admin Access to /api/admin (Allowed)
+
+```bash
+curl -X GET http://localhost:3000/api/admin \
+  -H "Authorization: Bearer <ADMIN_JWT>"
+```
+
+**Response (200):**
+```json
+{
+  "success": true,
+  "message": "Admin statistics fetched successfully",
+  "data": {
+    "totalUsers": 125,
+    "totalTasks": 487,
+    "totalComments": 1204,
+    "adminUsers": [
+      {
+        "id": "cm6...",
+        "name": "Admin User",
+        "email": "admin@sprintlite.com",
+        "role": "Admin",
+        "createdAt": "2026-01-15T10:00:00.000Z"
+      }
+    ],
+    "timestamp": "2026-01-19T12:00:00.000Z"
+  }
+}
+```
+
+---
+
+#### ❌ No Token (Denied)
+
+```bash
+curl -X GET http://localhost:3000/api/admin
+```
+
+**Response (401):**
+```json
+{
+  "success": false,
+  "message": "Authorization header missing or invalid",
+  "error": {
+    "code": "E007"
+  },
+  "timestamp": "2026-01-19T12:00:00.000Z"
+}
+```
+
+---
+
+### 🎯 Principle of Least Privilege
+
+**Definition:** Each user should have the minimum level of access necessary to perform their job functions.
+
+**Implementation in our system:**
+
+| Role | Can Access | Cannot Access |
+|------|-----------|---------------|
+| **Member** | Own tasks, assigned tasks, comments | Admin routes, other users' data |
+| **Admin** | User management, system stats, all tasks | Role changes, user deletion |
+| **Owner** | Everything (full control) | N/A |
+
+**Benefits:**
+- **Security** — Limits damage from compromised accounts
+- **Compliance** — Meets regulatory requirements (GDPR, SOC2)
+- **Auditability** — Clear accountability for actions
+- **Simplicity** — Users see only relevant features
+
+---
+
+### 🔄 Adding New Roles
+
+The system is designed for easy role extension:
+
+**Example: Add "Editor" role**
+
+1. **Update Prisma schema:**
+```prisma
+role String @default("Member") // Owner, Admin, Editor, Member
+```
+
+2. **Define permissions:**
+```javascript
+// lib/permissions.js
+export const PERMISSIONS = {
+  Owner: ['*'], // All permissions
+  Admin: ['users:read', 'users:update', 'tasks:*', 'stats:read'],
+  Editor: ['tasks:*', 'comments:*'],
+  Member: ['tasks:read', 'tasks:update:own', 'comments:*'],
+};
+```
+
+3. **Protect routes:**
+```javascript
+const authResult = requireRole(request, ["Admin", "Editor"]);
+```
+
+**That's it!** The middleware handles the rest.
+
+---
+
+### ⚠️ Security Risks Without RBAC
+
+**If middleware checks were missing or incorrect:**
+
+1. **Privilege Escalation**
+   - Member users could access admin endpoints
+   - Read sensitive data (all user emails, passwords hashes)
+   - Modify other users' data
+
+2. **Data Breach**
+   - Unauthorized access to PII
+   - GDPR/compliance violations
+   - Legal liability
+
+3. **System Manipulation**
+   - Delete users or tasks
+   - Change roles (make self admin)
+   - Corrupt data integrity
+
+4. **Business Impact**
+   - Loss of customer trust
+   - Financial penalties
+   - Reputational damage
+
+**Example attack scenario:**
+```bash
+# Without RBAC, any authenticated user could:
+DELETE /api/admin/users?id=<ANY_USER_ID>
+# → Delete any user in the system!
+```
+
+---
+
+### 🔒 Security Best Practices
+
+| Practice | Implementation |
+|----------|----------------|
+| **Defense in Depth** | Multiple layers: JWT validation → Role check → Business logic |
+| **Fail Secure** | Deny access by default, allow only with explicit permission |
+| **Clear Errors** | Different status codes for auth (401) vs authorization (403) |
+| **Audit Logging** | Log all admin actions (future enhancement) |
+| **Role in Token** | Include role in JWT for stateless checks |
+| **Regular Review** | Periodically audit role assignments |
+
+---
+
+### 📊 Response Codes
+
+| Code | Meaning | Use Case |
+|------|---------|----------|
+| **200** | OK | Successful request with required role |
+| **401** | Unauthorized | Missing, invalid, or expired token |
+| **403** | Forbidden | Valid token but insufficient role |
+| **404** | Not Found | Resource doesn't exist |
+
+**Key distinction:**
+- **401** = "Who are you?" (authentication)
+- **403** = "I know who you are, but you can't do that" (authorization)
+
+---
+
+### ✅ Implementation Checklist
+
+- [x] Add role field to User model (Prisma)
+- [x] Create `hasRole()` helper function
+- [x] Create `requireRole()` middleware
+- [x] Implement admin-only routes
+- [x] Test with different role levels
+- [x] Return proper HTTP status codes (401 vs 403)
+- [x] Write automated RBAC tests
+- [x] Document middleware flow
+- [x] Document security implications
+
+---
+
+### 🚀 Next Steps
+
+**Enhancements to consider:**
+
+1. **Permission-Based Access Control (PBAC)**
+   - Fine-grained permissions beyond roles
+   - E.g., `tasks:create`, `users:delete`, `settings:write`
+
+2. **Resource-Level Authorization**
+   - Users can only edit own tasks
+   - Admins can edit any task in their team
+
+3. **Dynamic Roles**
+   - Create custom roles via admin UI
+   - Assign permissions per role
+
+4. **Audit Logging**
+   - Log all admin actions
+   - Track who accessed what, when
+
+5. **Rate Limiting per Role**
+   - Members: 100 req/hour
+   - Admins: 1000 req/hour
+
+6. **Time-Based Access**
+   - Temporary elevated permissions
+   - Auto-revoke after duration
+
+---
+
+### 💡 Key Learnings
+
+1. **Authentication ≠ Authorization** — Knowing who you are vs what you can do
+2. **Deny by default** — Explicit allow is safer than explicit deny
+3. **Role in JWT** — Enables stateless authorization checks
+4. **Separate concerns** — Auth middleware → Role check → Business logic
+5. **Clear error codes** — 401 for auth, 403 for authz
+6. **Least privilege** — Minimize access, maximize security
+7. **Extensible design** — Easy to add new roles/permissions
+8. **Test thoroughly** — RBAC bugs can be catastrophic
