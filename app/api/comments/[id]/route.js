@@ -1,7 +1,8 @@
-import { NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import pkg from "pg";
+import { sendSuccess, sendError, handlePrismaError, ERROR_CODES } from "@/lib/responseHandler";
+
 const { Pool } = pkg;
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
@@ -38,23 +39,13 @@ export async function GET(request, { params }) {
     });
 
     if (!comment) {
-      return NextResponse.json({ success: false, error: "Comment not found" }, { status: 404 });
+      return sendError("Comment not found", ERROR_CODES.COMMENT_NOT_FOUND, 404);
     }
 
-    return NextResponse.json({
-      success: true,
-      data: comment,
-    });
+    return sendSuccess(comment, "Comment fetched successfully");
   } catch (error) {
     console.error("GET /api/comments/[id] error:", error);
-    return NextResponse.json(
-      {
-        success: false,
-        error: "Failed to fetch comment",
-        message: error.message,
-      },
-      { status: 500 }
-    );
+    return handlePrismaError(error);
   }
 }
 
@@ -72,7 +63,9 @@ export async function PUT(request, { params }) {
     const { content } = body;
 
     if (!content) {
-      return NextResponse.json({ success: false, error: "Content is required" }, { status: 400 });
+      return sendError("Content is required", ERROR_CODES.MISSING_REQUIRED_FIELDS, 400, {
+        required: ["content"],
+      });
     }
 
     // Check if comment exists
@@ -81,7 +74,7 @@ export async function PUT(request, { params }) {
     });
 
     if (!existingComment) {
-      return NextResponse.json({ success: false, error: "Comment not found" }, { status: 404 });
+      return sendError("Comment not found", ERROR_CODES.COMMENT_NOT_FOUND, 404);
     }
 
     // Update comment
@@ -98,21 +91,10 @@ export async function PUT(request, { params }) {
       },
     });
 
-    return NextResponse.json({
-      success: true,
-      message: "Comment updated successfully",
-      data: comment,
-    });
+    return sendSuccess(comment, "Comment updated successfully");
   } catch (error) {
     console.error("PUT /api/comments/[id] error:", error);
-    return NextResponse.json(
-      {
-        success: false,
-        error: "Failed to update comment",
-        message: error.message,
-      },
-      { status: 500 }
-    );
+    return handlePrismaError(error);
   }
 }
 
@@ -130,7 +112,7 @@ export async function DELETE(request, { params }) {
     });
 
     if (!existingComment) {
-      return NextResponse.json({ success: false, error: "Comment not found" }, { status: 404 });
+      return sendError("Comment not found", ERROR_CODES.COMMENT_NOT_FOUND, 404);
     }
 
     // Delete comment
@@ -138,22 +120,9 @@ export async function DELETE(request, { params }) {
       where: { id },
     });
 
-    return NextResponse.json({
-      success: true,
-      message: "Comment deleted successfully",
-      deleted: {
-        commentId: id,
-      },
-    });
+    return sendSuccess({ commentId: id }, "Comment deleted successfully");
   } catch (error) {
     console.error("DELETE /api/comments/[id] error:", error);
-    return NextResponse.json(
-      {
-        success: false,
-        error: "Failed to delete comment",
-        message: error.message,
-      },
-      { status: 500 }
-    );
+    return handlePrismaError(error);
   }
 }

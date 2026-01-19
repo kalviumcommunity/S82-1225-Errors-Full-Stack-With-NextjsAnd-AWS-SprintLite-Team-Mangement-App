@@ -1,7 +1,8 @@
-import { NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import pkg from "pg";
+import { sendSuccess, sendError, handlePrismaError, ERROR_CODES } from "@/lib/responseHandler";
+
 const { Pool } = pkg;
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
@@ -51,23 +52,13 @@ export async function GET(request, { params }) {
     });
 
     if (!task) {
-      return NextResponse.json({ success: false, error: "Task not found" }, { status: 404 });
+      return sendError("Task not found", ERROR_CODES.TASK_NOT_FOUND, 404);
     }
 
-    return NextResponse.json({
-      success: true,
-      data: task,
-    });
+    return sendSuccess(task, "Task fetched successfully");
   } catch (error) {
     console.error("GET /api/tasks/[id] error:", error);
-    return NextResponse.json(
-      {
-        success: false,
-        error: "Failed to fetch task",
-        message: error.message,
-      },
-      { status: 500 }
-    );
+    return handlePrismaError(error);
   }
 }
 
@@ -95,21 +86,17 @@ export async function PUT(request, { params }) {
     });
 
     if (!existingTask) {
-      return NextResponse.json({ success: false, error: "Task not found" }, { status: 404 });
+      return sendError("Task not found", ERROR_CODES.TASK_NOT_FOUND, 404);
     }
 
     // Validate status
     if (status) {
       const validStatuses = ["Todo", "InProgress", "Done"];
       if (!validStatuses.includes(status)) {
-        return NextResponse.json(
-          {
-            success: false,
-            error: "Invalid status",
-            validValues: validStatuses,
-          },
-          { status: 400 }
-        );
+        return sendError("Invalid status value", ERROR_CODES.INVALID_INPUT, 400, {
+          validValues: validStatuses,
+          provided: status,
+        });
       }
     }
 
@@ -117,14 +104,10 @@ export async function PUT(request, { params }) {
     if (priority) {
       const validPriorities = ["Low", "Medium", "High"];
       if (!validPriorities.includes(priority)) {
-        return NextResponse.json(
-          {
-            success: false,
-            error: "Invalid priority",
-            validValues: validPriorities,
-          },
-          { status: 400 }
-        );
+        return sendError("Invalid priority value", ERROR_CODES.INVALID_INPUT, 400, {
+          validValues: validPriorities,
+          provided: priority,
+        });
       }
     }
 
@@ -138,7 +121,7 @@ export async function PUT(request, { params }) {
     if (dueDate !== undefined) updateData.dueDate = dueDate ? new Date(dueDate) : null;
 
     if (Object.keys(updateData).length === 0) {
-      return NextResponse.json({ success: false, error: "No fields to update" }, { status: 400 });
+      return sendError("No fields to update", ERROR_CODES.VALIDATION_ERROR, 400);
     }
 
     // Update task
@@ -155,27 +138,10 @@ export async function PUT(request, { params }) {
       },
     });
 
-    return NextResponse.json({
-      success: true,
-      message: "Task updated successfully",
-      data: task,
-    });
+    return sendSuccess(task, "Task updated successfully");
   } catch (error) {
     console.error("PUT /api/tasks/[id] error:", error);
-
-    // Handle foreign key constraint violations
-    if (error.code === "P2003") {
-      return NextResponse.json({ success: false, error: "Invalid assigneeId" }, { status: 400 });
-    }
-
-    return NextResponse.json(
-      {
-        success: false,
-        error: "Failed to update task",
-        message: error.message,
-      },
-      { status: 500 }
-    );
+    return handlePrismaError(error);
   }
 }
 
@@ -198,7 +164,7 @@ export async function DELETE(request, { params }) {
     });
 
     if (!existingTask) {
-      return NextResponse.json({ success: false, error: "Task not found" }, { status: 404 });
+      return sendError("Task not found", ERROR_CODES.TASK_NOT_FOUND, 404);
     }
 
     // Delete task (cascade will handle comments)
@@ -206,25 +172,17 @@ export async function DELETE(request, { params }) {
       where: { id },
     });
 
-    return NextResponse.json({
-      success: true,
-      message: "Task deleted successfully",
-      deleted: {
+    return sendSuccess(
+      {
         taskId: id,
         cascaded: {
           comments: existingTask._count.comments,
         },
       },
-    });
+      "Task deleted successfully"
+    );
   } catch (error) {
     console.error("DELETE /api/tasks/[id] error:", error);
-    return NextResponse.json(
-      {
-        success: false,
-        error: "Failed to delete task",
-        message: error.message,
-      },
-      { status: 500 }
-    );
+    return handlePrismaError(error);
   }
 }

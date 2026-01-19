@@ -1,7 +1,8 @@
-import { NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import pkg from "pg";
+import { sendSuccess, sendError, handlePrismaError, ERROR_CODES } from "@/lib/responseHandler";
+
 const { Pool } = pkg;
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
@@ -75,23 +76,13 @@ export async function GET(request, { params }) {
     });
 
     if (!user) {
-      return NextResponse.json({ success: false, error: "User not found" }, { status: 404 });
+      return sendError("User not found", ERROR_CODES.USER_NOT_FOUND, 404);
     }
 
-    return NextResponse.json({
-      success: true,
-      data: user,
-    });
+    return sendSuccess(user, "User fetched successfully");
   } catch (error) {
     console.error("GET /api/users/[id] error:", error);
-    return NextResponse.json(
-      {
-        success: false,
-        error: "Failed to fetch user",
-        message: error.message,
-      },
-      { status: 500 }
-    );
+    return handlePrismaError(error);
   }
 }
 
@@ -116,7 +107,7 @@ export async function PUT(request, { params }) {
     });
 
     if (!existingUser) {
-      return NextResponse.json({ success: false, error: "User not found" }, { status: 404 });
+      return sendError("User not found", ERROR_CODES.USER_NOT_FOUND, 404);
     }
 
     // Build update data
@@ -126,7 +117,7 @@ export async function PUT(request, { params }) {
     if (avatar !== undefined) updateData.avatar = avatar;
 
     if (Object.keys(updateData).length === 0) {
-      return NextResponse.json({ success: false, error: "No fields to update" }, { status: 400 });
+      return sendError("No fields to update", ERROR_CODES.VALIDATION_ERROR, 400);
     }
 
     // Update user
@@ -143,21 +134,10 @@ export async function PUT(request, { params }) {
       },
     });
 
-    return NextResponse.json({
-      success: true,
-      message: "User updated successfully",
-      data: user,
-    });
+    return sendSuccess(user, "User updated successfully");
   } catch (error) {
     console.error("PUT /api/users/[id] error:", error);
-    return NextResponse.json(
-      {
-        success: false,
-        error: "Failed to update user",
-        message: error.message,
-      },
-      { status: 500 }
-    );
+    return handlePrismaError(error);
   }
 }
 
@@ -184,7 +164,7 @@ export async function DELETE(request, { params }) {
     });
 
     if (!existingUser) {
-      return NextResponse.json({ success: false, error: "User not found" }, { status: 404 });
+      return sendError("User not found", ERROR_CODES.USER_NOT_FOUND, 404);
     }
 
     // Delete user (cascade will handle related records)
@@ -192,26 +172,18 @@ export async function DELETE(request, { params }) {
       where: { id },
     });
 
-    return NextResponse.json({
-      success: true,
-      message: "User deleted successfully",
-      deleted: {
+    return sendSuccess(
+      {
         userId: id,
         cascaded: {
           createdTasks: existingUser._count.createdTasks,
           comments: existingUser._count.comments,
         },
       },
-    });
+      "User deleted successfully"
+    );
   } catch (error) {
     console.error("DELETE /api/users/[id] error:", error);
-    return NextResponse.json(
-      {
-        success: false,
-        error: "Failed to delete user",
-        message: error.message,
-      },
-      { status: 500 }
-    );
+    return handlePrismaError(error);
   }
 }

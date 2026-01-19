@@ -1,7 +1,8 @@
-import { NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import pkg from "pg";
+import { sendSuccess, sendError, handlePrismaError, ERROR_CODES } from "@/lib/responseHandler";
+
 const { Pool } = pkg;
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
@@ -66,28 +67,23 @@ export async function GET(request) {
 
     const totalPages = Math.ceil(total / limit);
 
-    return NextResponse.json({
-      success: true,
-      data: comments,
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages,
-        hasNextPage: page < totalPages,
-        hasPrevPage: page > 1,
+    return sendSuccess(
+      {
+        comments,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages,
+          hasNextPage: page < totalPages,
+          hasPrevPage: page > 1,
+        },
       },
-    });
+      "Comments fetched successfully"
+    );
   } catch (error) {
     console.error("GET /api/comments error:", error);
-    return NextResponse.json(
-      {
-        success: false,
-        error: "Failed to fetch comments",
-        message: error.message,
-      },
-      { status: 500 }
-    );
+    return handlePrismaError(error);
   }
 }
 
@@ -107,13 +103,11 @@ export async function POST(request) {
 
     // Validation
     if (!content || !taskId || !userId) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Missing required fields",
-          required: ["content", "taskId", "userId"],
-        },
-        { status: 400 }
+      return sendError(
+        "Missing required fields: content, taskId, userId",
+        ERROR_CODES.MISSING_REQUIRED_FIELDS,
+        400,
+        { required: ["content", "taskId", "userId"] }
       );
     }
 
@@ -141,32 +135,9 @@ export async function POST(request) {
       },
     });
 
-    return NextResponse.json(
-      {
-        success: true,
-        message: "Comment created successfully",
-        data: comment,
-      },
-      { status: 201 }
-    );
+    return sendSuccess(comment, "Comment created successfully", 201);
   } catch (error) {
     console.error("POST /api/comments error:", error);
-
-    // Handle foreign key constraint violations
-    if (error.code === "P2003") {
-      return NextResponse.json(
-        { success: false, error: "Invalid taskId or userId" },
-        { status: 400 }
-      );
-    }
-
-    return NextResponse.json(
-      {
-        success: false,
-        error: "Failed to create comment",
-        message: error.message,
-      },
-      { status: 500 }
-    );
+    return handlePrismaError(error);
   }
 }
