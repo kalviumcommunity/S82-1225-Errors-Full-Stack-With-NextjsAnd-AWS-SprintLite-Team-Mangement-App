@@ -12,6 +12,7 @@ import {
 import { createTaskSchema, taskQuerySchema } from "@/lib/schemas/taskSchema";
 import { handleError } from "@/lib/errorHandler";
 import { logRequest, logResponse } from "@/lib/logger";
+import { getCache, setCache, deleteCachePattern } from "@/lib/redis";
 
 const { Pool } = pkg;
 
@@ -34,6 +35,8 @@ const prisma = new PrismaClient({ adapter });
  * - sortOrder: Sort direction (asc, desc)
  */
 export async function GET(request) {
+  const startTime = Date.now();
+
   try {
     const { searchParams } = new URL(request.url);
 
@@ -52,6 +55,32 @@ export async function GET(request) {
     const sortBy = searchParams.get("sortBy") || "createdAt";
     const sortOrder = searchParams.get("sortOrder") || "desc";
 
+    // Build cache key based on all query parameters
+    const cacheKey = `tasks:list:page=${page}:limit=${limit}:status=${status || "all"}:priority=${priority || "all"}:assignee=${assigneeId || "all"}:creator=${creatorId || "all"}:sort=${sortBy}:${sortOrder}`;
+
+    // Try cache first
+    const cached = await getCache(cacheKey);
+    if (cached) {
+      const responseTime = Date.now() - startTime;
+      console.log(`✅ Cache HIT for ${cacheKey} (${responseTime}ms)`);
+
+      const response = sendSuccess(
+        {
+          ...cached,
+          _cache: {
+            hit: true,
+            responseTime: `${responseTime}ms`,
+          },
+        },
+        "Tasks fetched successfully (from cache)"
+      );
+
+      logResponse(request, response, 200);
+      return response;
+    }
+
+    console.log(`❌ Cache MISS for ${cacheKey} - Fetching from database`);
+
     // Build where clause
     const where = {};
     if (status) where.status = status;
@@ -59,7 +88,7 @@ export async function GET(request) {
     if (assigneeId) where.assigneeId = assigneeId;
     if (creatorId) where.creatorId = creatorId;
 
-    // Fetch tasks with pagination
+    // Fetch tasks with pagination from database
     const [tasks, total] = await prisma.$transaction([
       prisma.task.findMany({
         where,
@@ -95,26 +124,40 @@ export async function GET(request) {
 
     const totalPages = Math.ceil(total / limit);
 
+    const data = {
+      tasks,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages,
+        hasNextPage: page < totalPages,
+        hasPrevPage: page > 1,
+      },
+      filters: {
+        status,
+        priority,
+        assigneeId,
+        creatorId,
+      },
+      sorting: {
+        sortBy,
+        sortOrder,
+      },
+    };
+
+    // Cache with 60 second TTL
+    await setCache(cacheKey, data, 60);
+
+    const responseTime = Date.now() - startTime;
+    console.log(`💾 Cached ${cacheKey} with 60s TTL (${responseTime}ms)`);
+
     const response = sendSuccess(
       {
-        tasks,
-        pagination: {
-          page,
-          limit,
-          total,
-          totalPages,
-          hasNextPage: page < totalPages,
-          hasPrevPage: page > 1,
-        },
-        filters: {
-          status,
-          priority,
-          assigneeId,
-          creatorId,
-        },
-        sorting: {
-          sortBy,
-          sortOrder,
+        ...data,
+        _cache: {
+          hit: false,
+          responseTime: `${responseTime}ms`,
         },
       },
       "Tasks fetched successfully"
@@ -170,6 +213,10 @@ export async function POST(request) {
         },
       },
     });
+
+    // Invalidate all task list caches
+    await deleteCachePattern("tasks:list:*");
+    console.log("🗑️  Cache invalidated: tasks:list:* (new task created)");
 
     const response = sendSuccess(task, "Task created successfully", 201);
     logResponse(request, response, 201);

@@ -7503,3 +7503,10 @@ curl http://localhost:3000/api/test-error?type=generic
 6. **Stack traces** — Essential in dev, dangerous in prod
 7. **Consistent API** — Same error format across all routes
 8. **Logging ≠ Errors** — Log everything, show errors selectively
+
+---
+
+### DAY 16 - MOHIT
+## Redis Caching Layer
+
+See full documentation above...
