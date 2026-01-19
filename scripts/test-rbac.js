@@ -34,7 +34,7 @@ async function testRBAC() {
         password: "AdminPass123",
       }),
     });
-    const adminData = await adminRes.json();
+    await adminRes.json();
     console.log("✅ Admin user created:", adminEmail);
     console.log('⚠️  Note: Manually update role to "Admin" in database for full testing\n');
 

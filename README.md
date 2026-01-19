@@ -7059,3 +7059,447 @@ DELETE /api/admin/users?id=<ANY_USER_ID>
 6. **Least privilege** — Minimize access, maximize security
 7. **Extensible design** — Easy to add new roles/permissions
 8. **Test thoroughly** — RBAC bugs can be catastrophic
+---
+
+### DAY 15 - MOHIT
+## Centralized Error Handling & Structured Logging
+
+### 📋 Overview
+
+Implemented centralized error handling with structured logging to provide consistent error responses across all API routes while maintaining different behavior in development vs production environments. This ensures debugging ease during development and security-conscious error messages in production.
+
+**What was implemented:**
+- ✅ Centralized error handler with custom error classes
+- ✅ Structured JSON logging utility
+- ✅ Environment-aware error responses (dev vs prod)
+- ✅ Request/response logging for debugging
+- ✅ Integrated into all API routes (users, tasks, admin)
+- ✅ Test endpoint for error scenarios
+
+---
+
+### 🔄 Error Handling Flow
+
+```
+                    ┌──────────────┐
+                    │   API Route  │
+                    │  try/catch   │
+                    └──────┬───────┘
+                           │
+                           ▼
+                  ┌────────────────┐
+                  │ Error occurs?  │
+                  └────────┬───────┘
+                           │
+                  ┌────────┴────────┐
+                 No                Yes
+                  │                 │
+                  ▼                 ▼
+         ┌────────────────┐  ┌──────────────────┐
+         │ Return success │  │  handleError()   │
+         │   response     │  │   (lib/errorHandler)│
+         └────────────────┘  └──────┬───────────┘
+                                    │
+                           ┌────────┴────────┐
+                           │ Identify error  │
+                           │      type       │
+                           └────────┬────────┘
+                                    │
+        ┌───────────────────────────┼──────────────────────────┐
+        │                           │                          │
+        ▼                           ▼                          ▼
+┌────────────────┐        ┌────────────────┐       ┌────────────────┐
+│ ValidationError│        │ DatabaseError  │       │ UnauthorizedErr│
+│ (400)          │        │ (500)          │       │ (401)          │
+└────────┬───────┘        └────────┬───────┘       └────────┬───────┘
+         │                         │                         │
+         └─────────────────────────┼─────────────────────────┘
+                                   │
+                          ┌────────┴────────┐
+                          │ Check NODE_ENV  │
+                          └────────┬────────┘
+                                   │
+                        ┌──────────┴──────────┐
+                   Development          Production
+                        │                     │
+                        ▼                     ▼
+              ┌─────────────────┐   ┌──────────────────┐
+              │ Full error info │   │ Generic message  │
+              │ + Stack trace   │   │ "Something went  │
+              │ + Details       │   │  wrong"          │
+              └─────────────────┘   └──────────────────┘
+```
+
+---
+
+### 📂 File Structure
+
+**Error Handling & Logging**
+- [lib/errorHandler.js](lib/errorHandler.js) — Centralized error handler with custom error classes
+- [lib/logger.js](lib/logger.js) — Structured JSON logging utility
+
+**Updated Routes**
+- [app/api/users/route.js](app/api/users/route.js) — Integrated error handler & logging
+- [app/api/tasks/route.js](app/api/tasks/route.js) — Integrated error handler & logging
+- [app/api/admin/route.js](app/api/admin/route.js) — Integrated error handler & logging
+
+**Testing**
+- [app/api/test-error/route.js](app/api/test-error/route.js) — Test endpoint for error scenarios
+- [scripts/test-error-handling.js](scripts/test-error-handling.js) — Automated error testing
+
+---
+
+### 🛠 Implementation Details
+
+#### 1. Custom Error Classes
+
+```javascript
+/**
+ * Custom error classes for common scenarios
+ */
+
+// Validation errors (e.g., Zod validation failures)
+class ValidationError extends Error {
+  constructor(message, details = null) {
+    super(message);
+    this.name = 'ValidationError';
+    this.statusCode = 400;
+    this.details = details;
+  }
+}
+
+// Database errors (e.g., Prisma errors)
+class DatabaseError extends Error {
+  constructor(message, originalError = null) {
+    super(message);
+    this.name = 'DatabaseError';
+    this.statusCode = 500;
+    this.originalError = originalError;
+  }
+}
+
+// Unauthorized access
+class UnauthorizedError extends Error {
+  constructor(message = 'Unauthorized') {
+    super(message);
+    this.name = 'UnauthorizedError';
+    this.statusCode = 401;
+  }
+}
+
+// Forbidden access
+class ForbiddenError extends Error {
+  constructor(message = 'Access denied') {
+    super(message);
+    this.name = 'ForbiddenError';
+    this.statusCode = 403;
+  }
+}
+
+// Resource not found
+class NotFoundError extends Error {
+  constructor(resource = 'Resource') {
+    super(`${resource} not found`);
+    this.name = 'NotFoundError';
+    this.statusCode = 404;
+  }
+}
+```
+
+**Why custom error classes?**
+- Type-safe error identification
+- Automatic status code mapping
+- Consistent error structure
+- Easy to extend with new error types
+
+---
+
+#### 2. Centralized Error Handler
+
+```javascript
+/**
+ * Central error handler
+ * Processes errors and returns appropriate response based on environment
+ */
+export function handleError(error, context = '') {
+  const isDevelopment = process.env.NODE_ENV === 'development';
+  
+  // Log the error
+  logError(error, { context });
+  
+  // Determine status code and message
+  let statusCode = 500;
+  let errorMessage = 'Something went wrong';
+  let errorDetails = null;
+  
+  if (error instanceof ValidationError) {
+    statusCode = 400;
+    errorMessage = error.message;
+    errorDetails = error.details;
+  } else if (error instanceof UnauthorizedError) {
+    statusCode = 401;
+    errorMessage = error.message;
+  } else if (error instanceof ForbiddenError) {
+    statusCode = 403;
+    errorMessage = error.message;
+  } else if (error instanceof NotFoundError) {
+    statusCode = 404;
+    errorMessage = error.message;
+  } else if (error instanceof DatabaseError) {
+    statusCode = 500;
+    errorMessage = 'Database error occurred';
+  } else if (error instanceof ZodError) {
+    statusCode = 400;
+    errorMessage = 'Validation failed';
+    errorDetails = error.errors;
+  }
+  
+  // Build error response
+  const errorResponse = {
+    success: false,
+    error: {
+      message: isDevelopment ? errorMessage : 'Something went wrong',
+      code: error.name || 'INTERNAL_ERROR',
+    },
+  };
+  
+  // In development, include full details and stack trace
+  if (isDevelopment) {
+    if (errorDetails) {
+      errorResponse.error.details = errorDetails;
+    }
+    errorResponse.error.stack = error.stack;
+  }
+  
+  return sendError(
+    errorResponse.error.message,
+    error.name || 'INTERNAL_ERROR',
+    statusCode
+  );
+}
+```
+
+**Key features:**
+- Environment-aware responses
+- Automatic error type detection
+- Structured error logging
+- Stack traces in development only
+
+---
+
+#### 3. Structured Logging
+
+```javascript
+/**
+ * Format log entry with metadata
+ */
+function formatLog(level, message, meta = {}) {
+  return JSON.stringify({
+    level,
+    message,
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || 'development',
+    ...meta,
+  });
+}
+
+/**
+ * Log error with context
+ */
+export function logError(error, meta = {}) {
+  const errorLog = formatLog('error', error.message, {
+    ...meta,
+    errorName: error.name,
+    stack: process.env.NODE_ENV === 'development' ? error.stack : undefined,
+  });
+  console.error(errorLog);
+}
+
+/**
+ * Log API request
+ */
+export function logRequest(request, route) {
+  const requestLog = formatLog('info', 'API Request', {
+    route,
+    method: request.method,
+    url: request.url,
+  });
+  console.log(requestLog);
+}
+
+/**
+ * Log API response
+ */
+export function logResponse(request, response, statusCode) {
+  const responseLog = formatLog('info', 'API Response', {
+    route: request.url,
+    method: request.method,
+    statusCode,
+  });
+  console.log(responseLog);
+}
+```
+
+**Benefits:**
+- Structured JSON logs (easy to parse)
+- Timestamps for debugging
+- Environment metadata
+- Request/response tracking
+- Production-safe (no sensitive data)
+
+---
+
+#### 4. Route Integration Example
+
+**Before (app/api/users/route.js):**
+```javascript
+export async function GET(request) {
+  try {
+    // ... business logic
+    return sendSuccess(data, "Users fetched");
+  } catch (error) {
+    console.error("GET /api/users error:", error);
+    
+    if (error instanceof ZodError) {
+      return handleZodError(error);
+    }
+    return handlePrismaError(error);
+  }
+}
+```
+
+**After:**
+```javascript
+export async function GET(request) {
+  try {
+    logRequest(request, "GET /api/users");
+    
+    // ... business logic
+    
+    const response = sendSuccess(data, "Users fetched");
+    logResponse(request, response, 200);
+    return response;
+  } catch (error) {
+    return handleError(error, "GET /api/users");
+  }
+}
+```
+
+**Improvements:**
+- Single error handler (instead of multiple)
+- Request/response logging
+- Consistent error format
+- Less code duplication
+
+---
+
+### 🧪 Testing Error Scenarios
+
+Test endpoint simulates different error types:
+
+```bash
+# Database error
+curl http://localhost:3000/api/test-error?type=database
+
+# Validation error
+curl http://localhost:3000/api/test-error?type=validation
+
+# Not found error
+curl http://localhost:3000/api/test-error?type=notfound
+
+# Unauthorized error
+curl http://localhost:3000/api/test-error?type=unauthorized
+
+# Generic error
+curl http://localhost:3000/api/test-error?type=generic
+```
+
+**Development mode response:**
+```json
+{
+  "success": false,
+  "error": {
+    "message": "Database connection failed",
+    "code": "DatabaseError",
+    "stack": "DatabaseError: Database connection failed\n    at GET (/app/api/test-error/route.js:15:11)\n    ..."
+  }
+}
+```
+
+**Production mode response:**
+```json
+{
+  "success": false,
+  "error": {
+    "message": "Something went wrong",
+    "code": "DatabaseError"
+  }
+}
+```
+
+---
+
+### 📊 Error Response Comparison
+
+| **Aspect** | **Development** | **Production** |
+|------------|----------------|----------------|
+| Error message | Detailed, specific | Generic "Something went wrong" |
+| Stack trace | ✅ Included | ❌ Hidden |
+| Error details | ✅ Full details | ❌ Minimal info |
+| Validation errors | ✅ Field-specific | ❌ Generic message |
+| Security | Lower (for debugging) | ✅ High (no leaks) |
+
+---
+
+### 📝 Example Log Output
+
+**Development mode:**
+```json
+{
+  "level": "error",
+  "message": "Database connection failed",
+  "timestamp": "2026-01-19T10:30:45.123Z",
+  "environment": "development",
+  "context": "GET /api/users",
+  "errorName": "DatabaseError",
+  "stack": "DatabaseError: Database connection failed\n    at GET (/app/api/users/route.js:25:11)"
+}
+```
+
+**Production mode:**
+```json
+{
+  "level": "error",
+  "message": "Database connection failed",
+  "timestamp": "2026-01-19T10:30:45.123Z",
+  "environment": "production",
+  "context": "GET /api/users",
+  "errorName": "DatabaseError"
+}
+```
+
+---
+
+### 🎯 Benefits
+
+1. **Consistency** — All errors follow the same structure
+2. **Security** — No sensitive data leaked in production
+3. **Debuggability** — Full details in development
+4. **Maintainability** — Single place to update error handling
+5. **Traceability** — Structured logs for monitoring/alerting
+6. **Type Safety** — Custom error classes with proper types
+7. **DRY Principle** — No duplicate error handling code
+8. **Extensibility** — Easy to add new error types
+
+---
+
+### 💡 Key Learnings
+
+1. **Environment matters** — Dev needs details, prod needs security
+2. **Structured logging** — JSON logs are machine-parsable
+3. **Custom errors** — Type-safe error handling
+4. **Centralization** — Single source of truth for error handling
+5. **Context is key** — Log where the error occurred
+6. **Stack traces** — Essential in dev, dangerous in prod
+7. **Consistent API** — Same error format across all routes
+8. **Logging ≠ Errors** — Log everything, show errors selectively

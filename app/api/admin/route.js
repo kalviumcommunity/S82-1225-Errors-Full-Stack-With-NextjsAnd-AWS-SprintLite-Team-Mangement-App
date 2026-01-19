@@ -1,6 +1,8 @@
 import { prisma } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
-import { sendSuccess, sendError, handlePrismaError, ERROR_CODES } from "@/lib/responseHandler";
+import { sendSuccess, sendError, ERROR_CODES } from "@/lib/responseHandler";
+import { handleError } from "@/lib/errorHandler";
+import { logRequest, logResponse } from "@/lib/logger";
 
 /**
  * GET /api/admin
@@ -10,6 +12,8 @@ import { sendSuccess, sendError, handlePrismaError, ERROR_CODES } from "@/lib/re
  */
 export async function GET(request) {
   try {
+    logRequest(request, "GET /api/admin");
+
     // Require Admin or Owner role
     const authResult = requireRole(request, ["Admin", "Owner"]);
     if (authResult.errorResponse) {
@@ -45,10 +49,11 @@ export async function GET(request) {
       timestamp: new Date().toISOString(),
     };
 
-    return sendSuccess(stats, "Admin statistics fetched successfully");
+    const response = sendSuccess(stats, "Admin statistics fetched successfully");
+    logResponse(request, response, 200);
+    return response;
   } catch (error) {
-    console.error("GET /api/admin error:", error);
-    return handlePrismaError(error);
+    return handleError(error, "GET /api/admin");
   }
 }
 
@@ -60,6 +65,8 @@ export async function GET(request) {
  */
 export async function POST(request) {
   try {
+    logRequest(request, "POST /api/admin");
+
     // Require Owner role (highest privilege)
     const authResult = requireRole(request, "Owner");
     if (authResult.errorResponse) {
@@ -87,12 +94,13 @@ export async function POST(request) {
         },
       });
 
-      return sendSuccess(updatedUser, `User role updated to ${newRole}`, 200);
+      const response = sendSuccess(updatedUser, `User role updated to ${newRole}`, 200);
+      logResponse(request, response, 200);
+      return response;
     }
 
     return sendError("Invalid action", ERROR_CODES.VALIDATION_ERROR, 400);
   } catch (error) {
-    console.error("POST /api/admin error:", error);
-    return handlePrismaError(error);
+    return handleError(error, "POST /api/admin");
   }
 }
