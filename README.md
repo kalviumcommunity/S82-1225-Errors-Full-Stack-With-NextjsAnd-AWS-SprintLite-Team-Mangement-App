@@ -7505,8 +7505,3 @@ curl http://localhost:3000/api/test-error?type=generic
 8. **Logging ≠ Errors** — Log everything, show errors selectively
 
 ---
-
-### DAY 16 - MOHIT
-## Redis Caching Layer
-
-See full documentation above...

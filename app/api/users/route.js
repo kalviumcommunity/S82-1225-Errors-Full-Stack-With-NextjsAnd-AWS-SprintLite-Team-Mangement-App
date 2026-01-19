@@ -1,14 +1,7 @@
 import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import pkg from "pg";
-import { ZodError } from "zod";
-import {
-  sendSuccess,
-  sendError,
-  handlePrismaError,
-  handleZodError,
-  ERROR_CODES,
-} from "@/lib/responseHandler";
+import { sendSuccess, sendError, ERROR_CODES } from "@/lib/responseHandler";
 import { authenticateRequest } from "@/lib/auth";
 import { createUserSchema, userQuerySchema } from "@/lib/schemas/userSchema";
 import { handleError } from "@/lib/errorHandler";
