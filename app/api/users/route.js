@@ -9,6 +9,7 @@ import {
   handleZodError,
   ERROR_CODES,
 } from "@/lib/responseHandler";
+import { authenticateRequest } from "@/lib/auth";
 import { createUserSchema, userQuerySchema } from "@/lib/schemas/userSchema";
 
 const { Pool } = pkg;
@@ -29,6 +30,11 @@ const prisma = new PrismaClient({ adapter });
  */
 export async function GET(request) {
   try {
+    const authResult = authenticateRequest(request);
+    if (authResult.errorResponse) {
+      return authResult.errorResponse;
+    }
+
     const { searchParams } = new URL(request.url);
 
     // Validate query parameters with Zod
@@ -120,6 +126,11 @@ export async function GET(request) {
  */
 export async function POST(request) {
   try {
+    const authResult = authenticateRequest(request);
+    if (authResult.errorResponse) {
+      return authResult.errorResponse;
+    }
+
     const body = await request.json();
 
     // Validate request body with Zod

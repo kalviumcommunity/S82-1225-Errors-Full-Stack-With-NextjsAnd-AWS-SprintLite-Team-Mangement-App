@@ -6007,5 +6007,557 @@ export const createUserSchema = z.object({
 
 
 
+---
+
+### 2.20 Objective — JWT Auth
+
+#### Flow
+1. Signup (`POST /api/auth/signup`): validate input, hash password with bcrypt, store user, issue JWT.
+2. Login (`POST /api/auth/login`): validate input, verify password with bcrypt.compare, issue JWT with `userId` and `email`.
+3. Protected route (`GET /api/users`): check `Authorization: Bearer <token>`, reject if missing/invalid/expired.
+
+#### Key Files
+- [lib/auth.js](lib/auth.js) — JWT sign/verify and request authentication helper.
+- [lib/schemas/authSchema.js](lib/schemas/authSchema.js) — Zod schemas for signup/login.
+- [app/api/auth/signup/route.ts](app/api/auth/signup/route.ts) — signup handler (hash + create user + token).
+- [app/api/auth/login/route.ts](app/api/auth/login/route.ts) — login handler (verify + token).
+- [app/api/users/route.js](app/api/users/route.js) — protected route using Bearer token.
+
+#### Bcrypt & JWT Usage
+```typescript
+// Hash password before storing
+const hashedPassword = await bcrypt.hash(password, 10);
+
+// Generate JWT with user id/email
+const token = signAuthToken({ userId: user.id, email: user.email, role: user.role });
+
+// Guard a route with Bearer token
+const authResult = authenticateRequest(request);
+if (authResult.errorResponse) {
+  return authResult.errorResponse;
+}
+```
+
+#### Sample Responses
+Signup success
+```json
+{
+  "success": true,
+  "message": "Signup successful",
+  "data": { "user": { "id": "...", "email": "alice@example.com" }, "token": "<jwt>" },
+  "timestamp": "2026-01-19T10:15:00.000Z"
+}
+```
+
+Duplicate email (signup)
+```json
+{
+  "success": false,
+  "message": "User with this email already exists",
+  "error": { "code": "E102" },
+  "timestamp": "2026-01-19T10:15:00.000Z"
+}
+```
+
+Invalid credentials (login)
+```json
+{
+  "success": false,
+  "message": "Invalid email or password",
+  "error": { "code": "E103" },
+  "timestamp": "2026-01-19T10:15:00.000Z"
+}
+```
+
+Missing/invalid token (protected route)
+```json
+{
+  "success": false,
+  "message": "Authorization header missing or invalid",
+  "error": { "code": "E007" },
+  "timestamp": "2026-01-19T10:15:00.000Z"
+}
+```
+
+#### Token Expiry, Refresh, Storage
+- Tokens expire in `JWT_EXPIRES_IN` (defaults to 1h); rotate secrets per environment with `JWT_SECRET`.
+- Refresh strategy (future): issue long-lived refresh token in an httpOnly, secure cookie; rotate on use; revoke on logout.
+- Storage options: prefer httpOnly cookies for XSS resistance; if using localStorage, mitigate with strict Content Security Policy and short-lived access tokens. Always send tokens via `Authorization: Bearer` headers, never in URLs.
+
+#### Security Impact
+- Bcrypt hashing prevents leaked DB credentials from being usable.
+- JWT verification blocks unauthorized access to protected data.
+- Clear error codes/messages make client handling predictable without revealing sensitive details.
+
+---
+
+### DAY 13 - MOHIT
+## JWT Authentication & Protected Routes
+
+### 📋 Overview
+
+Implemented complete JWT-based authentication system with signup, login, protected routes, and frontend auth pages. Users can register, authenticate, and access protected resources using Bearer tokens.
+
+**What was implemented:**
+- ✅ Signup API with password hashing (bcrypt, 10 rounds)
+- ✅ Login API with password verification and JWT issuance
+- ✅ Protected API routes with JWT middleware
+- ✅ Dark-themed signup and login pages
+- ✅ JWT helper utilities for sign/verify
+- ✅ Zod validation schemas for auth
+- ✅ Environment configuration for JWT secrets
+
+---
+
+### 🔐 Authentication Flow
+
+```
+┌─────────────┐     POST /api/auth/signup      ┌──────────┐
+│   Browser   │ ──────────────────────────────> │  Server  │
+│             │  {name, email, password}        │          │
+│             │                                 │ 1. Validate with Zod
+│             │                                 │ 2. Check existing user
+│             │                                 │ 3. Hash password (bcrypt)
+│             │                                 │ 4. Create user in DB
+│             │                                 │ 5. Sign JWT token
+│             │ <────────────────────────────── │          │
+│             │  {success, user, token}         └──────────┘
+│             │
+│  Store token in localStorage
+│
+│
+┌─────────────┐     POST /api/auth/login       ┌──────────┐
+│   Browser   │ ──────────────────────────────> │  Server  │
+│             │  {email, password}              │          │
+│             │                                 │ 1. Validate with Zod
+│             │                                 │ 2. Find user by email
+│             │                                 │ 3. Verify password
+│             │                                 │ 4. Sign JWT token
+│             │ <────────────────────────────── │          │
+│             │  {success, user, token}         └──────────┘
+│
+│
+┌─────────────┐     GET /api/users             ┌──────────┐
+│   Browser   │ ──────────────────────────────> │  Server  │
+│             │  Authorization: Bearer <token>  │          │
+│             │                                 │ 1. Extract token
+│             │                                 │ 2. Verify JWT
+│             │                                 │ 3. Decode user info
+│             │                                 │ 4. Fetch data
+│             │ <────────────────────────────── │          │
+│             │  {success, data}                └──────────┘
+└─────────────┘
+```
+
+---
+
+### 📂 File Structure
+
+**Backend (API Routes)**
+- [app/api/auth/signup/route.js](app/api/auth/signup/route.js) — User registration endpoint
+- [app/api/auth/login/route.js](app/api/auth/login/route.js) — User login endpoint
+- [app/api/users/route.js](app/api/users/route.js) — Protected route example
+
+**Frontend (Pages)**
+- [app/auth/signup/page.jsx](app/auth/signup/page.jsx) — Signup form with dark theme
+- [app/auth/login/page.jsx](app/auth/login/page.jsx) — Login form with dark theme
+
+**Utilities**
+- [lib/auth.js](lib/auth.js) — JWT sign/verify helpers, authenticateRequest middleware
+- [lib/schemas/authSchema.js](lib/schemas/authSchema.js) — Zod validation schemas for signup/login
+
+**Configuration**
+- `.env.development` — JWT_SECRET and JWT_EXPIRES_IN added
+- `.env.example` — Template with JWT configuration
+
+**Testing**
+- [scripts/test-auth.js](scripts/test-auth.js) — Automated authentication flow tests
+
+---
+
+### 🔧 Key Implementation Details
+
+#### 1. Password Hashing (Signup)
+
+```javascript
+import bcrypt from "bcryptjs";
+
+// Hash password before storing
+const hashedPassword = await bcrypt.hash(password, 10);
+
+const user = await prisma.user.create({
+  data: { name, email, password: hashedPassword },
+});
+```
+
+**Security:** Uses bcrypt with 10 salt rounds (industry standard). Plain-text passwords never stored.
+
+---
+
+#### 2. JWT Token Generation
+
+```javascript
+import jwt from "jsonwebtoken";
+
+const JWT_SECRET = process.env.JWT_SECRET || "dev-secret";
+const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || "1h";
+
+export const signAuthToken = (payload) => {
+  return jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+};
+
+// Usage
+const token = signAuthToken({ 
+  userId: user.id, 
+  email: user.email, 
+  role: user.role 
+});
+```
+
+**Payload includes:** userId, email, role — minimal data to avoid token bloat.
+
+---
+
+#### 3. Password Verification (Login)
+
+```javascript
+// Compare plain-text password with hashed password
+const isPasswordValid = await bcrypt.compare(password, user.password);
+
+if (!isPasswordValid) {
+  return sendError("Invalid email or password", ERROR_CODES.INVALID_CREDENTIALS, 401);
+}
+```
+
+**Security:** Generic error message prevents username enumeration.
+
+---
+
+#### 4. Protected Route Middleware
+
+```javascript
+import { authenticateRequest } from "@/lib/auth";
+
+export async function GET(request) {
+  // Verify JWT token
+  const authResult = authenticateRequest(request);
+  if (authResult.errorResponse) {
+    return authResult.errorResponse; // 401 Unauthorized
+  }
+
+  // authResult.user contains decoded token data
+  const { userId, email, role } = authResult.user;
+
+  // Proceed with authorized logic
+  const users = await prisma.user.findMany();
+  return sendSuccess({ users }, "Users fetched successfully");
+}
+```
+
+**Middleware checks:**
+- Authorization header present
+- Bearer token format
+- Token signature valid
+- Token not expired
+
+---
+
+### 🎨 Frontend Pages
+
+#### Signup Page (`/auth/signup`)
+
+**Features:**
+- Dark theme matching app (gray-950/900/800)
+- Real-time form validation
+- Password requirements enforcement
+- Error handling with styled messages
+- Redirects to dashboard on success
+- Token stored in localStorage
+
+**Form fields:** Name, Email, Password
+
+---
+
+#### Login Page (`/auth/login`)
+
+**Features:**
+- Dark theme matching app
+- Remember me checkbox
+- Forgot password link (placeholder)
+- Test credentials displayed
+- Error handling
+- Redirects to dashboard on success
+
+**Test credentials:**
+- Email: `mohit@sprintlite.com`
+- Password: `password123`
+
+---
+
+### 📝 Sample API Responses
+
+#### ✅ Signup Success (201)
+
+```json
+{
+  "success": true,
+  "message": "Signup successful",
+  "data": {
+    "user": {
+      "id": "cm6abc123def",
+      "name": "Alice",
+      "email": "alice@example.com",
+      "role": "Member",
+      "avatar": null,
+      "createdAt": "2026-01-19T10:30:00.000Z"
+    },
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+  },
+  "timestamp": "2026-01-19T10:30:00.000Z"
+}
+```
+
+---
+
+#### ❌ Duplicate Email (409)
+
+```json
+{
+  "success": false,
+  "message": "User with this email already exists",
+  "error": {
+    "code": "E102"
+  },
+  "timestamp": "2026-01-19T10:30:00.000Z"
+}
+```
+
+---
+
+#### ✅ Login Success (200)
+
+```json
+{
+  "success": true,
+  "message": "Login successful",
+  "data": {
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "user": {
+      "id": "cm6abc123def",
+      "email": "alice@example.com",
+      "name": "Alice",
+      "role": "Member",
+      "avatar": null
+    }
+  },
+  "timestamp": "2026-01-19T10:30:00.000Z"
+}
+```
+
+---
+
+#### ❌ Invalid Credentials (401)
+
+```json
+{
+  "success": false,
+  "message": "Invalid email or password",
+  "error": {
+    "code": "E103"
+  },
+  "timestamp": "2026-01-19T10:30:00.000Z"
+}
+```
+
+---
+
+#### ❌ Missing Token (401)
+
+```json
+{
+  "success": false,
+  "message": "Authorization header missing or invalid",
+  "error": {
+    "code": "E007"
+  },
+  "timestamp": "2026-01-19T10:30:00.000Z"
+}
+```
+
+---
+
+#### ❌ Expired Token (401)
+
+```json
+{
+  "success": false,
+  "message": "Token has expired",
+  "error": {
+    "code": "E007"
+  },
+  "timestamp": "2026-01-19T10:30:00.000Z"
+}
+```
+
+---
+
+### 🧪 Testing
+
+Run automated authentication tests:
+
+```bash
+# Ensure dev server is running
+npm run dev
+
+# In another terminal
+node scripts/test-auth.js
+```
+
+**Test coverage:**
+1. ✅ Signup with valid data → creates user, returns token
+2. ✅ Login with valid credentials → returns token
+3. ✅ Protected route without token → 401 Unauthorized
+4. ✅ Protected route with valid token → 200 Success
+5. ✅ Login with invalid password → 401 Invalid credentials
+6. ✅ Duplicate signup → 409 Conflict
+
+---
+
+### 🔒 Security Best Practices
+
+| Practice | Implementation |
+|----------|----------------|
+| **Password Storage** | Bcrypt hashing with 10 rounds (never plain-text) |
+| **Password Strength** | Zod validation: min 8 chars, uppercase, lowercase, number |
+| **Token Signing** | HS256 algorithm with secret from environment |
+| **Token Expiry** | Default 1 hour (configurable via JWT_EXPIRES_IN) |
+| **Secret Management** | JWT_SECRET stored in .env (never committed) |
+| **Error Messages** | Generic messages to prevent user enumeration |
+| **Authorization Header** | Bearer token pattern (not in URL/query params) |
+| **HTTPS** | Required in production to prevent token interception |
+
+---
+
+### 🔐 Token Storage Options
+
+#### Option 1: localStorage (Current Implementation)
+
+**Pros:**
+- Simple to implement
+- Works with all API requests
+- Persists across browser sessions
+
+**Cons:**
+- Vulnerable to XSS attacks
+- Accessible to any JavaScript code
+
+**Mitigation:**
+- Keep token lifetime short (1h default)
+- Implement CSP headers
+- Sanitize all user inputs
+
+---
+
+#### Option 2: httpOnly Cookies (Recommended for Production)
+
+**Pros:**
+- Not accessible to JavaScript (XSS protection)
+- Automatically sent with requests
+- Can be secured with SameSite and Secure flags
+
+**Cons:**
+- Requires CSRF protection
+- More complex logout flow
+
+**Implementation (future):**
+```javascript
+// Server sets cookie
+response.cookies.set('token', token, {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === 'production',
+  sameSite: 'strict',
+  maxAge: 3600 // 1 hour
+});
+```
+
+---
+
+### 🔄 Token Refresh Strategy (Future Enhancement)
+
+**Current:** Single access token with 1-hour expiry
+
+**Recommended:**
+1. **Access Token:** Short-lived (15 min), sent in Authorization header
+2. **Refresh Token:** Long-lived (7 days), stored in httpOnly cookie
+3. **Refresh Endpoint:** `/api/auth/refresh` to get new access token
+4. **Logout:** Invalidate refresh token in database
+
+**Benefits:**
+- Limits exposure window if token is compromised
+- Better user experience (no frequent re-login)
+- Can revoke refresh tokens server-side
+
+---
+
+### 📊 Environment Variables
+
+Add to `.env.development`:
+
+```bash
+# JWT Authentication
+JWT_SECRET="dev-secret-key-change-in-production-minimum-32-characters"
+JWT_EXPIRES_IN="1h"
+```
+
+**Production secrets:** Generate with `openssl rand -base64 32`
+
+---
+
+### ✅ Implementation Checklist
+
+- [x] Install jsonwebtoken package
+- [x] Create JWT helper utilities (sign/verify)
+- [x] Create Zod auth schemas (signup/login)
+- [x] Implement signup API with bcrypt hashing
+- [x] Implement login API with password verification
+- [x] Add JWT middleware to protected routes
+- [x] Create dark-themed signup page
+- [x] Create dark-themed login page
+- [x] Add JWT environment variables
+- [x] Write automated test script
+- [x] Document in README
+
+---
+
+### 🚀 Next Steps
+
+**Enhancements to consider:**
+1. **Email Verification** — Send confirmation email on signup
+2. **Password Reset** — Forgot password flow with email token
+3. **Refresh Tokens** — Long-lived tokens for better UX
+4. **httpOnly Cookies** — More secure token storage
+5. **Rate Limiting** — Prevent brute-force attacks
+6. **2FA** — Two-factor authentication for admin accounts
+7. **Session Management** — Track active sessions in database
+8. **OAuth** — Social login (Google, GitHub)
+
+---
+
+### 💡 Key Learnings
+
+1. **Never store plain-text passwords** — Always use bcrypt or similar
+2. **Keep JWT payloads small** — Only essential data (userId, email, role)
+3. **Use Bearer token pattern** — Standard Authorization header format
+4. **Generic error messages** — Prevent username enumeration
+5. **Environment-specific secrets** — Different JWT_SECRET per environment
+6. **Short token lifetimes** — Reduce exposure window
+7. **HTTPS in production** — Prevent token interception
+8. **Validate on both sides** — Client for UX, server for security
+
+
+
+
+
+
 
 

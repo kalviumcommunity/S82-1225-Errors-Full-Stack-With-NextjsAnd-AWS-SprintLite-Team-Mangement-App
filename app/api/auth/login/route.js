@@ -1,27 +1,52 @@
-import { NextResponse } from "next/server";
+import { ZodError } from "zod";
+import bcrypt from "bcryptjs";
+import { prisma } from "@/lib/db";
+import { signAuthToken } from "@/lib/auth";
+import { loginSchema } from "@/lib/schemas/authSchema";
+import {
+  sendSuccess,
+  sendError,
+  handlePrismaError,
+  handleZodError,
+  ERROR_CODES,
+} from "@/lib/responseHandler";
 
-// POST /api/auth/login - User login
 export async function POST(request) {
   try {
-    const { email } = await request.json();
+    const body = await request.json();
+    const { email, password } = loginSchema.parse(body);
 
-    // TODO: Implement authentication logic
-    // 1. Validate input
-    // 2. Find user in database
-    // 3. Verify password (bcrypt)
-    // 4. Create session token
-    // 5. Set cookie/return token
+    const user = await prisma.user.findUnique({ where: { email } });
 
-    return NextResponse.json({
-      success: true,
-      message: "Login successful",
-      user: {
-        id: "1",
-        email,
-        name: "John Developer",
+    if (!user) {
+      return sendError("Invalid email or password", ERROR_CODES.INVALID_CREDENTIALS, 401);
+    }
+
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+    if (!isPasswordValid) {
+      return sendError("Invalid email or password", ERROR_CODES.INVALID_CREDENTIALS, 401);
+    }
+
+    const token = signAuthToken({ userId: user.id, email: user.email, role: user.role });
+
+    return sendSuccess(
+      {
+        token,
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          role: user.role,
+          avatar: user.avatar,
+        },
       },
-    });
-  } catch {
-    return NextResponse.json({ error: "Login failed" }, { status: 401 });
+      "Login successful"
+    );
+  } catch (error) {
+    if (error instanceof ZodError) {
+      return handleZodError(error);
+    }
+
+    return handlePrismaError(error);
   }
 }
