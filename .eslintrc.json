@@ -6,6 +6,9 @@
   "rules": {
     "no-console": "warn",
     "semi": ["error", "always"],
-    "quotes": ["error", "double"]
+    "quotes": ["error", "double"],
+    "prettier/prettier": ["error", {
+      "endOfLine": "auto"
+    }]
   }
 }

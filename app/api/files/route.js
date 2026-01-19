@@ -6,8 +6,8 @@
 
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import prisma from "@/lib/db";
-import { authenticate } from "@/lib/auth";
+import { prisma } from "@/lib/db";
+import { authenticateRequest } from "@/lib/auth";
 import { handleError } from "@/lib/errorHandler";
 import { getCache, setCache, deleteCache } from "@/lib/redis";
 
@@ -24,9 +24,9 @@ const fileMetadataSchema = z.object({
 export async function POST(request) {
   try {
     // Authenticate user
-    const user = await authenticate(request);
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const { user, errorResponse } = authenticateRequest(request);
+    if (errorResponse) {
+      return errorResponse;
     }
 
     // Parse and validate request body
@@ -76,9 +76,9 @@ export async function POST(request) {
 export async function GET(request) {
   try {
     // Authenticate user
-    const user = await authenticate(request);
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const { user, errorResponse } = authenticateRequest(request);
+    if (errorResponse) {
+      return errorResponse;
     }
 
     // Get query parameters
@@ -137,9 +137,9 @@ export async function GET(request) {
 export async function DELETE(request) {
   try {
     // Authenticate user
-    const user = await authenticate(request);
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const { user, errorResponse } = authenticateRequest(request);
+    if (errorResponse) {
+      return errorResponse;
     }
 
     // Get file ID from URL
