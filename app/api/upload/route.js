@@ -20,7 +20,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { generateUploadUrl, getPublicUrl, validateFile } from "@/lib/s3";
-import { authenticate } from "@/lib/auth";
+import { authenticateRequest } from "@/lib/auth";
 import { handleError } from "@/lib/errorHandler";
 
 // Validation schema
@@ -33,9 +33,9 @@ const uploadRequestSchema = z.object({
 export async function POST(request) {
   try {
     // Authenticate user
-    const user = await authenticate(request);
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const { user, errorResponse } = authenticateRequest(request);
+    if (errorResponse) {
+      return errorResponse;
     }
 
     // Parse and validate request body

@@ -26,7 +26,7 @@ import {
   taskAssignedTemplate,
   passwordResetTemplate,
 } from "@/lib/email";
-import { authenticate } from "@/lib/auth";
+import { authenticateRequest } from "@/lib/auth";
 import { handleError } from "@/lib/errorHandler";
 import { logInfo, logError } from "@/lib/logger";
 
@@ -50,9 +50,9 @@ const emailRequestSchema = z.object({
 export async function POST(request) {
   try {
     // Authenticate user (only authenticated users can send emails)
-    const user = await authenticate(request);
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const { user, errorResponse } = authenticateRequest(request);
+    if (errorResponse) {
+      return errorResponse;
     }
 
     // Parse and validate request body
@@ -144,9 +144,9 @@ export async function POST(request) {
 export async function GET(request) {
   try {
     // Authenticate user
-    const user = await authenticate(request);
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const { user, errorResponse } = authenticateRequest(request);
+    if (errorResponse) {
+      return errorResponse;
     }
 
     // Check if email configuration is complete
