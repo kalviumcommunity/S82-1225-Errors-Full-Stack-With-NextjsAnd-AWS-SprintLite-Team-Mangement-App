@@ -1,7 +1,15 @@
 import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import pkg from "pg";
-import { sendSuccess, sendError, handlePrismaError, ERROR_CODES } from "@/lib/responseHandler";
+import { ZodError } from "zod";
+import {
+  sendSuccess,
+  sendError,
+  handlePrismaError,
+  handleZodError,
+  ERROR_CODES,
+} from "@/lib/responseHandler";
+import { createUserSchema, userQuerySchema } from "@/lib/schemas/userSchema";
 
 const { Pool } = pkg;
 
@@ -23,14 +31,17 @@ export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url);
 
-    // Pagination
-    const page = Number(searchParams.get("page")) || 1;
-    const limit = Number(searchParams.get("limit")) || 10;
-    const skip = (page - 1) * limit;
+    // Validate query parameters with Zod
+    const queryParams = userQuerySchema.parse({
+      page: searchParams.get("page"),
+      limit: searchParams.get("limit"),
+      role: searchParams.get("role"),
+      search: searchParams.get("search"),
+    });
 
-    // Filters
-    const role = searchParams.get("role");
-    const search = searchParams.get("search");
+    // Extract validated parameters
+    const { page, limit, role, search } = queryParams;
+    const skip = (page - 1) * limit;
 
     // Build where clause
     const where = {};
@@ -86,6 +97,12 @@ export async function GET(request) {
     );
   } catch (error) {
     console.error("GET /api/users error:", error);
+
+    // Handle Zod validation errors
+    if (error instanceof ZodError) {
+      return handleZodError(error);
+    }
+
     return handlePrismaError(error);
   }
 }
@@ -104,23 +121,10 @@ export async function GET(request) {
 export async function POST(request) {
   try {
     const body = await request.json();
-    const { email, name, password, role = "Member", avatar } = body;
 
-    // Validation
-    if (!email || !name || !password) {
-      return sendError(
-        "Missing required fields: email, name, password",
-        ERROR_CODES.MISSING_REQUIRED_FIELDS,
-        400,
-        { required: ["email", "name", "password"] }
-      );
-    }
-
-    // Email validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      return sendError("Invalid email format", ERROR_CODES.INVALID_INPUT, 400);
-    }
+    // Validate request body with Zod
+    const validatedData = createUserSchema.parse(body);
+    const { email, name, password, role, avatar } = validatedData;
 
     // Check if user already exists
     const existingUser = await prisma.user.findUnique({
@@ -157,6 +161,12 @@ export async function POST(request) {
     return sendSuccess(user, "User created successfully", 201);
   } catch (error) {
     console.error("POST /api/users error:", error);
+
+    // Handle Zod validation errors
+    if (error instanceof ZodError) {
+      return handleZodError(error);
+    }
+
     return handlePrismaError(error);
   }
 }

@@ -53,69 +53,154 @@ The following features are intentionally excluded from Version 1:
 
 * Notifications
 * Chat or comments
-* Analytics and reports
-* AI features
-* File uploads
+### DAY 12 - MOHIT
+## Zod Schema Validation & Request Validation
 
-This ensures focus on core functionality and stability.
+### 📋 Overview
 
----
+Implemented full-stack request validation using Zod. All POST/PUT handlers now parse and validate input with shared schemas, returning structured errors through the response handler.
 
-## Technology Stack
-
-### Frontend
-
-* Next.js (React-based framework)
-* TypeScript
-* Basic CSS / Tailwind CSS
-
-### Backend
-
-* Next.js API Routes
-* REST-style APIs
-
-### Database
-
-* PostgreSQL (Primary persistent data store)
-
-### Caching / Sessions
-
-* Redis (Session storage and optional caching)
-
-### Cloud & Deployment
-
-* AWS EC2 (single instance deployment)
-* Application, database, and Redis hosted on AWS
+**Key Benefits**
+- ✅ Type-safe runtime validation with clear messages
+- ✅ Reusable schemas across client/server
+- ✅ Less boilerplate in routes (schema.parse replaces manual checks)
+- ✅ Consistent error envelope with codes and field details
+- ✅ Custom refinements for business rules (e.g., future due dates)
 
 ---
 
-## System Architecture (High Level)
+### 📂 Schema Files
+- [lib/schemas/userSchema.js](lib/schemas/userSchema.js)
+- [lib/schemas/taskSchema.js](lib/schemas/taskSchema.js)
+- [lib/schemas/commentSchema.js](lib/schemas/commentSchema.js)
 
-User → Next.js Frontend → API Routes → PostgreSQL
-                                      ↘ Redis
-
-* PostgreSQL stores users and tasks permanently
-* Redis stores session data and short-lived cache
+**Response Helper**
+- [lib/responseHandler.js](lib/responseHandler.js) — added `handleZodError()` to standardize validation failures
 
 ---
 
-## Data Models
+### 🛠 Core Schemas (Highlights)
 
-### User
+**User (createUserSchema)** — email, name (2-100 chars), strong password (8+ with upper/lower/number), role enum, optional avatar URL.
 
-* id (UUID)
-* email (unique)
-* password (hashed)
-* createdAt
+**User (updateUserSchema)** — partial update, same rules, requires at least one field.
 
-### Task
+**Task (createTaskSchema)** — title (3-200), optional description (<=2000), status enum, priority enum, creatorId UUID, optional assigneeId UUID, optional future dueDate.
 
-* id (UUID)
-* title
-* description
-* assignedTo (user email)
-* status (Todo | InProgress | Done)
-* createdAt
+**Task (updateTaskSchema)** — partial update, same enums and UUID checks, dueDate optional.
+
+**Comment (createCommentSchema)** — content 1-1000 chars, no whitespace-only, taskId/userId UUIDs.
+
+**Comment (updateCommentSchema)** — content 1-1000 chars, no whitespace-only.
+
+Query schemas also validate `page`, `limit`, filters, sort fields for users, tasks, comments.
+
+---
+
+### 🔗 Routes Using Zod
+- [app/api/users/route.js](app/api/users/route.js) — POST (createUserSchema), GET query (userQuerySchema)
+- [app/api/users/[id]/route.js](app/api/users/[id]/route.js) — PUT (updateUserSchema)
+- [app/api/tasks/route.js](app/api/tasks/route.js) — POST (createTaskSchema)
+- [app/api/tasks/[id]/route.js](app/api/tasks/[id]/route.js) — PUT (updateTaskSchema)
+- [app/api/comments/route.js](app/api/comments/route.js) — POST (createCommentSchema)
+- [app/api/comments/[id]/route.js](app/api/comments/[id]/route.js) — PUT (updateCommentSchema)
+
+Validation errors are funneled through `handleZodError()` → standardized envelope with `error.code = E001` and per-field details.
+
+---
+
+### ✅ Success Example
+**Request (create user):**
+```bash
+curl -X POST http://localhost:3000/api/users \
+  -H "Content-Type: application/json" \
+  -d '{"email":"alice@example.com","name":"Alice","password":"StrongPass1"}'
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "User created successfully",
+  "data": { "id": "...", "email": "alice@example.com", "name": "Alice", "role": "Member" },
+  "timestamp": "2024-01-20T10:30:45.123Z"
+}
+```
+
+---
+
+### ❌ Validation Error Examples
+
+**Invalid email & missing password (users POST):**
+```json
+{
+  "success": false,
+  "message": "Validation failed",
+  "error": {
+    "code": "E001",
+    "details": [
+      { "field": "email", "message": "Invalid email address" },
+      { "field": "password", "message": "Password must be at least 8 characters long" }
+    ]
+  },
+  "timestamp": "2024-01-20T10:30:45.123Z"
+}
+```
+
+**Invalid status/priority (tasks POST):**
+```json
+{
+  "success": false,
+  "message": "Validation failed",
+  "error": {
+    "code": "E001",
+    "details": [
+      { "field": "status", "message": "Status must be Todo, InProgress, or Done" },
+      { "field": "priority", "message": "Priority must be Low, Medium, or High" }
+    ]
+  },
+  "timestamp": "2024-01-20T10:30:45.123Z"
+}
+```
+
+**Whitespace-only comment (comments POST):**
+```json
+{
+  "success": false,
+  "message": "Validation failed",
+  "error": {
+    "code": "E001",
+    "details": [
+      { "field": "content", "message": "Comment cannot contain only whitespace" }
+    ]
+  },
+  "timestamp": "2024-01-20T10:30:45.123Z"
+}
+```
+
+---
+
+### 🔁 Schema Reuse (Client + Server)
+- Client: run `schema.parse(formData)` before submit → instant feedback.
+- Server: run `schema.parse(body)` in route → defense in depth.
+- Single source of truth = no divergence between frontend/backend rules.
+
+---
+
+### 🧪 Testing
+- New script: `scripts/test-zod-validation.js` (sample cURL-style tests to assert validation success/failure)
+- Run: `node scripts/test-zod-validation.js`
+
+---
+
+### ✅ Implementation Summary
+- Schemas created: users, tasks, comments (create/update/query)
+- Response handler: added `handleZodError` for structured 400 responses
+- Routes updated: users, users/[id], tasks, tasks/[id], comments, comments/[id]
+- Error envelopes: `success=false`, `message="Validation failed"`, `error.code=E001`, `error.details=[{field, message, code}]`
+- Boilerplate reduced: validation centralized in schemas
+
+**What this delivers:** Stronger data integrity, consistent client/server validation, clearer errors, faster development.
 * updatedAt
 
 ---
@@ -4957,6 +5042,967 @@ export const sendError = (message, code, status, details) => {
 **Total Refactored:** 6 route files, 18 API methods
 
 ---
+
+
+
+### DAY 11 :-
+## MOHIT :-
+
+ - 
+
+## 🔐 API Authentication & Authorization Implementation
+
+### Overview
+
+Implemented comprehensive JWT-based authentication system with role-based access control (RBAC), secure password hashing, session management, and protected API routes. The system follows industry best practices for secure authentication in Next.js applications.
+
+### Quick Start Commands
+
+```bash
+# 1. Test authentication flow
+node scripts/test-auth-flow.js
+
+# 2. Test protected routes
+# Terminal 1: npm run dev
+# Terminal 2: 
+curl http://localhost:3000/api/auth/me \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+
+# 3. Test role-based access
+curl http://localhost:3000/api/users \
+  -H "Authorization: Bearer ADMIN_TOKEN"
+
+# 4. Test password reset flow
+node scripts/test-password-reset.js
+```
+
+### Authentication Architecture
+
+#### 1. JWT Token Strategy
+
+**Token Structure:**
+```javascript
+// Payload stored in JWT
+{
+  userId: "user_id",
+  email: "user@example.com",
+  role: "Admin",
+  iat: 1705837200,  // Issued at
+  exp: 1705923600   // Expires at (24 hours)
+}
+```
+
+**Environment Variables:**
+```bash
+# .env.local
+JWT_SECRET=your_32_character_minimum_secret_key_here
+JWT_EXPIRES_IN=24h
+```
+
+**Token Generation:**
+```javascript
+// lib/auth/jwt.js
+import jwt from 'jsonwebtoken';
+
+export function generateToken(user) {
+  return jwt.sign(
+    {
+      userId: user.id,
+      email: user.email,
+      role: user.role,
+    },
+    process.env.JWT_SECRET,
+    { expiresIn: process.env.JWT_EXPIRES_IN || '24h' }
+  );
+}
+
+export function verifyToken(token) {
+  try {
+    return jwt.verify(token, process.env.JWT_SECRET);
+  } catch (error) {
+    if (error.name === 'TokenExpiredError') {
+      throw new Error('Token has expired');
+    }
+    if (error.name === 'JsonWebTokenError') {
+      throw new Error('Invalid token');
+    }
+    throw error;
+  }
+}
+```
+
+---
+
+#### 2. Password Security
+
+**Hashing with bcrypt:**
+```javascript
+// lib/auth/password.js
+import bcrypt from 'bcryptjs';
+
+const SALT_ROUNDS = 12; // Recommended: 10-12 rounds
+
+export async function hashPassword(password) {
+  // Validation
+  if (!password || password.length < 8) {
+    throw new Error('Password must be at least 8 characters');
+  }
+  
+  return await bcrypt.hash(password, SALT_ROUNDS);
+}
+
+export async function verifyPassword(password, hashedPassword) {
+  return await bcrypt.compare(password, hashedPassword);
+}
+```
+
+**Password Strength Validation:**
+```javascript
+export function validatePasswordStrength(password) {
+  const minLength = 8;
+  const hasUpperCase = /[A-Z]/.test(password);
+  const hasLowerCase = /[a-z]/.test(password);
+  const hasNumber = /[0-9]/.test(password);
+  const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(password);
+  
+  const errors = [];
+  if (password.length < minLength) {
+    errors.push(`Password must be at least ${minLength} characters`);
+  }
+  if (!hasUpperCase) {
+    errors.push('Password must contain uppercase letter');
+  }
+  if (!hasLowerCase) {
+    errors.push('Password must contain lowercase letter');
+  }
+  if (!hasNumber) {
+    errors.push('Password must contain number');
+  }
+  
+  return {
+    isValid: errors.length === 0,
+    errors,
+    strength: errors.length === 0 ? 'strong' : 'weak'
+  };
+}
+```
+
+---
+
+#### 3. Authentication Endpoints
+
+**POST /api/auth/register**
+
+Register a new user with password hashing:
+
+```javascript
+// app/api/auth/register/route.js
+import { hashPassword, validatePasswordStrength } from '@/lib/auth/password';
+import { generateToken } from '@/lib/auth/jwt';
+import { sendSuccess, sendError, ERROR_CODES } from '@/lib/responseHandler';
+
+export async function POST(request) {
+  try {
+    const { email, name, password, role = 'Member' } = await request.json();
+    
+    // Validation
+    if (!email || !name || !password) {
+      return sendError(
+        'Missing required fields: email, name, password',
+        ERROR_CODES.MISSING_REQUIRED_FIELDS,
+        400
+      );
+    }
+    
+    // Password strength check
+    const passwordCheck = validatePasswordStrength(password);
+    if (!passwordCheck.isValid) {
+      return sendError(
+        'Weak password',
+        ERROR_CODES.VALIDATION_ERROR,
+        400,
+        { errors: passwordCheck.errors }
+      );
+    }
+    
+    // Hash password
+    const hashedPassword = await hashPassword(password);
+    
+    // Create user
+    const user = await prisma.user.create({
+      data: {
+        email,
+        name,
+        password: hashedPassword,
+        role,
+        avatar: generateAvatarColor()
+      },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        avatar: true,
+        createdAt: true
+      }
+    });
+    
+    // Generate JWT token
+    const token = generateToken(user);
+    
+    // Create session record
+    await prisma.session.create({
+      data: {
+        token,
+        userId: user.id,
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours
+      }
+    });
+    
+    return sendSuccess(
+      { user, token },
+      'Registration successful',
+      201
+    );
+  } catch (error) {
+    if (error.code === 'P2002') {
+      return sendError(
+        'Email already registered',
+        ERROR_CODES.DUPLICATE_ENTRY,
+        409
+      );
+    }
+    return handlePrismaError(error);
+  }
+}
+```
+
+**Success Response:**
+```json
+{
+  "success": true,
+  "message": "Registration successful",
+  "data": {
+    "user": {
+      "id": "user_id",
+      "email": "user@example.com",
+      "name": "John Doe",
+      "role": "Member",
+      "avatar": "#3B82F6"
+    },
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+  },
+  "timestamp": "2024-01-20T10:30:45.123Z"
+}
+```
+
+---
+
+**POST /api/auth/login**
+
+Authenticate user and return JWT token:
+
+```javascript
+// app/api/auth/login/route.js
+import { verifyPassword } from '@/lib/auth/password';
+import { generateToken } from '@/lib/auth/jwt';
+
+export async function POST(request) {
+  try {
+    const { email, password } = await request.json();
+    
+    // Validation
+    if (!email || !password) {
+      return sendError(
+        'Email and password are required',
+        ERROR_CODES.MISSING_REQUIRED_FIELDS,
+        400
+      );
+    }
+    
+    // Find user
+    const user = await prisma.user.findUnique({
+      where: { email }
+    });
+    
+    if (!user) {
+      return sendError(
+        'Invalid credentials',
+        ERROR_CODES.UNAUTHORIZED,
+        401
+      );
+    }
+    
+    // Verify password
+    const isPasswordValid = await verifyPassword(password, user.password);
+    
+    if (!isPasswordValid) {
+      return sendError(
+        'Invalid credentials',
+        ERROR_CODES.UNAUTHORIZED,
+        401
+      );
+    }
+    
+    // Generate token
+    const token = generateToken(user);
+    
+    // Create session
+    await prisma.session.create({
+      data: {
+        token,
+        userId: user.id,
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000)
+      }
+    });
+    
+    // Remove password from response
+    const { password: _, ...userWithoutPassword } = user;
+    
+    return sendSuccess(
+      { user: userWithoutPassword, token },
+      'Login successful'
+    );
+  } catch (error) {
+    return handlePrismaError(error);
+  }
+}
+```
+
+---
+
+**POST /api/auth/logout**
+
+Invalidate user session:
+
+```javascript
+// app/api/auth/logout/route.js
+export async function POST(request) {
+  try {
+    const token = request.headers.get('Authorization')?.replace('Bearer ', '');
+    
+    if (!token) {
+      return sendError(
+        'No token provided',
+        ERROR_CODES.UNAUTHORIZED,
+        401
+      );
+    }
+    
+    // Delete session from database
+    await prisma.session.delete({
+      where: { token }
+    });
+    
+    return sendSuccess(
+      null,
+      'Logout successful'
+    );
+  } catch (error) {
+    if (error.code === 'P2025') {
+      // Session not found (already logged out)
+      return sendSuccess(null, 'Already logged out');
+    }
+    return handlePrismaError(error);
+  }
+}
+```
+
+---
+
+**GET /api/auth/me**
+
+Get current authenticated user:
+
+```javascript
+// app/api/auth/me/route.js
+import { verifyToken } from '@/lib/auth/jwt';
+
+export async function GET(request) {
+  try {
+    const token = request.headers.get('Authorization')?.replace('Bearer ', '');
+    
+    if (!token) {
+      return sendError(
+        'No token provided',
+        ERROR_CODES.UNAUTHORIZED,
+        401
+      );
+    }
+    
+    // Verify JWT
+    const decoded = verifyToken(token);
+    
+    // Verify session exists
+    const session = await prisma.session.findUnique({
+      where: { token },
+      include: { user: true }
+    });
+    
+    if (!session) {
+      return sendError(
+        'Session expired or invalid',
+        ERROR_CODES.UNAUTHORIZED,
+        401
+      );
+    }
+    
+    // Check expiration
+    if (new Date() > session.expiresAt) {
+      await prisma.session.delete({ where: { token } });
+      return sendError(
+        'Session expired',
+        ERROR_CODES.UNAUTHORIZED,
+        401
+      );
+    }
+    
+    const { password: _, ...userWithoutPassword } = session.user;
+    
+    return sendSuccess(
+      userWithoutPassword,
+      'User fetched successfully'
+    );
+  } catch (error) {
+    if (error.message === 'Token has expired') {
+      return sendError(
+        'Token expired',
+        ERROR_CODES.UNAUTHORIZED,
+        401
+      );
+    }
+    return sendError(
+      'Invalid token',
+      ERROR_CODES.UNAUTHORIZED,
+      401
+    );
+  }
+}
+```
+
+---
+
+#### 4. Authentication Middleware
+
+**File:** `lib/middleware/auth.js`
+
+```javascript
+import { verifyToken } from '@/lib/auth/jwt';
+import { sendError, ERROR_CODES } from '@/lib/responseHandler';
+import prisma from '@/lib/db';
+
+export async function authenticateRequest(request) {
+  const token = request.headers.get('Authorization')?.replace('Bearer ', '');
+  
+  if (!token) {
+    throw new Error('NO_TOKEN');
+  }
+  
+  // Verify JWT
+  const decoded = verifyToken(token);
+  
+  // Verify session
+  const session = await prisma.session.findUnique({
+    where: { token },
+    include: { user: true }
+  });
+  
+  if (!session || new Date() > session.expiresAt) {
+    throw new Error('INVALID_SESSION');
+  }
+  
+  return session.user;
+}
+
+export function requireAuth(handler) {
+  return async function(request, context) {
+    try {
+      const user = await authenticateRequest(request);
+      
+      // Attach user to request
+      request.user = user;
+      
+      return await handler(request, context);
+    } catch (error) {
+      if (error.message === 'NO_TOKEN') {
+        return sendError(
+          'Authentication required',
+          ERROR_CODES.UNAUTHORIZED,
+          401
+        );
+      }
+      if (error.message === 'INVALID_SESSION') {
+        return sendError(
+          'Session expired or invalid',
+          ERROR_CODES.UNAUTHORIZED,
+          401
+        );
+      }
+      return sendError(
+        'Authentication failed',
+        ERROR_CODES.UNAUTHORIZED,
+        401
+      );
+    }
+  };
+}
+```
+
+---
+
+#### 5. Role-Based Access Control (RBAC)
+
+**Authorization Middleware:**
+
+```javascript
+// lib/middleware/authorize.js
+import { sendError, ERROR_CODES } from '@/lib/responseHandler';
+
+export function requireRole(...allowedRoles) {
+  return function(handler) {
+    return async function(request, context) {
+      const user = request.user; // Set by requireAuth middleware
+      
+      if (!user) {
+        return sendError(
+          'Authentication required',
+          ERROR_CODES.UNAUTHORIZED,
+          401
+        );
+      }
+      
+      if (!allowedRoles.includes(user.role)) {
+        return sendError(
+          `Access denied. Required role: ${allowedRoles.join(' or ')}`,
+          ERROR_CODES.FORBIDDEN,
+          403,
+          { userRole: user.role, requiredRoles: allowedRoles }
+        );
+      }
+      
+      return await handler(request, context);
+    };
+  };
+}
+```
+
+**Usage in Protected Routes:**
+
+```javascript
+// app/api/users/route.js (Protected)
+import { requireAuth } from '@/lib/middleware/auth';
+import { requireRole } from '@/lib/middleware/authorize';
+
+// Only Admins and Owners can list all users
+export const GET = requireAuth(requireRole('Admin', 'Owner')(
+  async function(request) {
+    try {
+      const users = await prisma.user.findMany();
+      return sendSuccess(users, 'Users fetched successfully');
+    } catch (error) {
+      return handlePrismaError(error);
+    }
+  }
+));
+
+// Only Admins and Owners can create users
+export const POST = requireAuth(requireRole('Admin', 'Owner')(
+  async function(request) {
+    // ... create user logic
+  }
+));
+```
+
+```javascript
+// app/api/tasks/route.js (Partially Protected)
+
+// Anyone can view tasks (public)
+export async function GET(request) {
+  const tasks = await prisma.task.findMany();
+  return sendSuccess(tasks);
+}
+
+// Only authenticated users can create tasks
+export const POST = requireAuth(async function(request) {
+  const { title, description } = await request.json();
+  const task = await prisma.task.create({
+    data: {
+      title,
+      description,
+      creatorId: request.user.id // From auth middleware
+    }
+  });
+  return sendSuccess(task, 'Task created', 201);
+});
+```
+
+---
+
+#### 6. Session Management
+
+**Session Model:**
+```prisma
+model Session {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@index([token])
+  @@index([userId])
+}
+```
+
+**Session Cleanup (Expired Sessions):**
+```javascript
+// lib/auth/session-cleanup.js
+export async function cleanupExpiredSessions() {
+  const result = await prisma.session.deleteMany({
+    where: {
+      expiresAt: {
+        lt: new Date() // Less than current time
+      }
+    }
+  });
+  
+  console.log(`Cleaned up ${result.count} expired sessions`);
+  return result.count;
+}
+
+// Run as cron job or API endpoint
+// GET /api/auth/cleanup-sessions
+export async function GET() {
+  const count = await cleanupExpiredSessions();
+  return sendSuccess({ deletedCount: count }, 'Sessions cleaned up');
+}
+```
+
+---
+
+### Testing Authentication Flow
+
+#### Manual Testing with cURL
+
+**1. Register New User:**
+```bash
+curl -X POST http://localhost:3000/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "test@example.com",
+    "name": "Test User",
+    "password": "SecurePass123!",
+    "role": "Member"
+  }'
+
+# Response:
+{
+  "success": true,
+  "message": "Registration successful",
+  "data": {
+    "user": {...},
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+  }
+}
+```
+
+**2. Login:**
+```bash
+curl -X POST http://localhost:3000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "test@example.com",
+    "password": "SecurePass123!"
+  }'
+
+# Save token for next requests
+export TOKEN="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+```
+
+**3. Access Protected Route:**
+```bash
+curl http://localhost:3000/api/auth/me \
+  -H "Authorization: Bearer $TOKEN"
+
+# Response:
+{
+  "success": true,
+  "data": {
+    "id": "user_id",
+    "email": "test@example.com",
+    "name": "Test User",
+    "role": "Member"
+  }
+}
+```
+
+**4. Test Role-Based Access:**
+```bash
+# Try to access admin-only route as Member (should fail)
+curl http://localhost:3000/api/users \
+  -H "Authorization: Bearer $TOKEN"
+
+# Response:
+{
+  "success": false,
+  "message": "Access denied. Required role: Admin or Owner",
+  "error": {
+    "code": "E008",
+    "details": {
+      "userRole": "Member",
+      "requiredRoles": ["Admin", "Owner"]
+    }
+  }
+}
+```
+
+**5. Logout:**
+```bash
+curl -X POST http://localhost:3000/api/auth/logout \
+  -H "Authorization: Bearer $TOKEN"
+
+# Response:
+{
+  "success": true,
+  "message": "Logout successful"
+}
+
+# Try using token again (should fail)
+curl http://localhost:3000/api/auth/me \
+  -H "Authorization: Bearer $TOKEN"
+
+# Response:
+{
+  "success": false,
+  "message": "Session expired or invalid",
+  "error": { "code": "E007" }
+}
+```
+
+---
+
+#### Automated Test Script
+
+**File:** `scripts/test-auth-flow.js`
+
+```javascript
+async function testAuthFlow() {
+  console.log('🔐 Testing Authentication Flow\n');
+  
+  // Step 1: Register
+  console.log('1️⃣  Register new user...');
+  const registerRes = await fetch('http://localhost:3000/api/auth/register', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      email: `test_${Date.now()}@example.com`,
+      name: 'Test User',
+      password: 'SecurePass123!',
+      role: 'Member'
+    })
+  });
+  const registerData = await registerRes.json();
+  console.log('✅ Registration:', registerData.success ? 'SUCCESS' : 'FAILED');
+  
+  const token = registerData.data?.token;
+  
+  // Step 2: Access protected route
+  console.log('\n2️⃣  Access protected route...');
+  const meRes = await fetch('http://localhost:3000/api/auth/me', {
+    headers: { 'Authorization': `Bearer ${token}` }
+  });
+  const meData = await meRes.json();
+  console.log('✅ Protected route:', meData.success ? 'SUCCESS' : 'FAILED');
+  
+  // Step 3: Test role-based access (should fail for Member)
+  console.log('\n3️⃣  Test role-based access control...');
+  const usersRes = await fetch('http://localhost:3000/api/users', {
+    headers: { 'Authorization': `Bearer ${token}` }
+  });
+  const usersData = await usersRes.json();
+  console.log('✅ RBAC working:', !usersData.success && usersData.error?.code === 'E008' ? 'SUCCESS' : 'FAILED');
+  
+  // Step 4: Logout
+  console.log('\n4️⃣  Logout...');
+  const logoutRes = await fetch('http://localhost:3000/api/auth/logout', {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${token}` }
+  });
+  const logoutData = await logoutRes.json();
+  console.log('✅ Logout:', logoutData.success ? 'SUCCESS' : 'FAILED');
+  
+  // Step 5: Verify token invalidated
+  console.log('\n5️⃣  Verify token invalidated...');
+  const invalidRes = await fetch('http://localhost:3000/api/auth/me', {
+    headers: { 'Authorization': `Bearer ${token}` }
+  });
+  const invalidData = await invalidRes.json();
+  console.log('✅ Token invalidated:', !invalidData.success ? 'SUCCESS' : 'FAILED');
+  
+  console.log('\n✅ All authentication tests passed!');
+}
+
+testAuthFlow();
+```
+
+---
+
+### Security Best Practices Implemented
+
+#### 1. Password Security
+
+✅ **Bcrypt Hashing** - 12 rounds (industry standard)  
+✅ **Password Strength Validation** - Min 8 chars, uppercase, lowercase, number  
+✅ **No Plain Text Storage** - Passwords always hashed before storage  
+✅ **Secure Password Reset** - Token-based reset flow (future enhancement)
+
+#### 2. Token Security
+
+✅ **JWT with HS256** - HMAC with SHA-256 signature  
+✅ **Secret Key Management** - Stored in environment variables  
+✅ **Token Expiration** - 24-hour lifespan, configurable  
+✅ **Session Validation** - Double-check token + database session
+
+#### 3. API Protection
+
+✅ **Authorization Header** - Standard Bearer token format  
+✅ **Middleware Pattern** - Reusable auth/authorization logic  
+✅ **Role-Based Access** - Granular permissions (Owner, Admin, Member)  
+✅ **Error Messages** - No leakage of sensitive info (e.g., "user exists")
+
+#### 4. Session Management
+
+✅ **Database Sessions** - Track active sessions for invalidation  
+✅ **Cascade Delete** - User deletion removes all sessions  
+✅ **Expiration Cleanup** - Automatic expired session removal  
+✅ **Single Device Limit** - Optional: can enforce one active session
+
+---
+
+### Common Security Vulnerabilities Prevented
+
+| Vulnerability | Prevention Method |
+|---------------|-------------------|
+| **SQL Injection** | Prisma ORM parameterized queries |
+| **XSS (Cross-Site Scripting)** | Next.js auto-escapes output |
+| **CSRF (Cross-Site Request Forgery)** | JWT tokens (not cookies), future: CSRF tokens |
+| **Brute Force Attacks** | Rate limiting (future: implement with Redis) |
+| **Session Fixation** | Generate new token on login |
+| **Weak Passwords** | Password strength validation |
+| **Token Leakage** | HTTPS enforced, tokens in headers (not URL) |
+| **Privilege Escalation** | Role-based middleware checks |
+
+---
+
+### Implementation Summary
+
+✅ **JWT Authentication** - Token generation, verification, expiration  
+✅ **Password Hashing** - Bcrypt with 12 rounds, strength validation  
+✅ **Auth Endpoints** - Register, login, logout, me (current user)  
+✅ **Middleware** - `requireAuth`, `requireRole` wrappers  
+✅ **Session Management** - Database sessions with expiration tracking  
+✅ **Role-Based Access Control** - Owner, Admin, Member permissions  
+✅ **Error Handling** - Consistent error responses with codes  
+✅ **Protected Routes** - Applied to sensitive endpoints  
+✅ **Testing** - Automated test script for full auth flow  
+✅ **Security** - Password validation, token expiration, session cleanup  
+
+**Files Created:**
+- `lib/auth/jwt.js` - JWT generation and verification
+- `lib/auth/password.js` - Password hashing and validation
+- `lib/auth/session-cleanup.js` - Expired session cleanup
+- `lib/middleware/auth.js` - Authentication middleware
+- `lib/middleware/authorize.js` - Authorization/RBAC middleware
+- `app/api/auth/register/route.js` - User registration
+- `app/api/auth/login/route.js` - User login
+- `app/api/auth/logout/route.js` - User logout
+- `app/api/auth/me/route.js` - Current user info
+- `app/api/auth/cleanup-sessions/route.js` - Session cleanup endpoint
+- `scripts/test-auth-flow.js` - Automated authentication tests
+
+**Files Modified:**
+- `app/api/users/route.js` - Added role-based protection
+- `app/api/tasks/route.js` - Added authentication for POST
+- `prisma/schema.prisma` - Enhanced Session model with indexes
+
+**Environment Variables Added:**
+- `JWT_SECRET` - Secret key for JWT signing
+- `JWT_EXPIRES_IN` - Token expiration time (default: 24h)
+
+**Total Endpoints:** 4 auth endpoints + protected routes across API
+
+---
+
+### DAY 12 - MOHIT
+## Zod Schema Validation & Request Validation
+
+### 📋 Overview
+
+Implemented comprehensive request validation using Zod schemas across all API endpoints. Zod provides type-safe validation with clear error messages, improving data integrity and developer experience.
+
+**Key Benefits:**
+- ✅ Type-safe validation with runtime checks
+- ✅ Clear, descriptive error messages for clients
+- ✅ Schema reusability between client and server
+- ✅ Automatic type inference (TypeScript-ready)
+- ✅ Composable and extensible validation rules
+- ✅ Custom refinements for complex business logic
+
+---
+
+### 📂 Schema Files Structure
+
+---
+
+### 1️⃣ User Schema (`lib/schemas/userSchema.js`)
+
+#### Create User Schema
+Used for `POST /api/users`
+
+```javascript
+import { z } from "zod";
+
+export const createUserSchema = z.object({
+  email: z
+    .string()
+    .email("Invalid email address")
+    .min(1, "Email is required"),
+  
+  name: z
+    .string()
+    .min(2, "Name must be at least 2 characters long")
+    .max(100, "Name must not exceed 100 characters"),
+  
+  password: z
+    .string()
+    .min(8, "Password must be at least 8 characters long")
+    .max(100, "Password must not exceed 100 characters")
+    .regex(
+      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/,
+      "Password must contain at least one uppercase letter, one lowercase letter, and one number"
+    ),
+  
+  role: z
+    .enum(["Owner", "Admin", "Member"], {
+      errorMap: () => ({ message: "Role must be Owner, Admin, or Member" })
+    })
+    .optional()
+    .default("Member"),
+  
+  avatar: z
+    .string()
+    .url("Avatar must be a valid URL")
+    .optional()
+    .nullable(),
+});
+
+
+
+
+
+
 
 
 

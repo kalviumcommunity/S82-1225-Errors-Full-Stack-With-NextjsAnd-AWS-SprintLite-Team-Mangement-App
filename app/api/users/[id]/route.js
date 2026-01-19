@@ -1,7 +1,15 @@
 import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import pkg from "pg";
-import { sendSuccess, sendError, handlePrismaError, ERROR_CODES } from "@/lib/responseHandler";
+import { ZodError } from "zod";
+import {
+  sendSuccess,
+  sendError,
+  handlePrismaError,
+  handleZodError,
+  ERROR_CODES,
+} from "@/lib/responseHandler";
+import { updateUserSchema } from "@/lib/schemas/userSchema";
 
 const { Pool } = pkg;
 
@@ -99,7 +107,9 @@ export async function PUT(request, { params }) {
   try {
     const { id } = params;
     const body = await request.json();
-    const { name, role, avatar } = body;
+
+    // Validate request body with Zod
+    const validatedData = updateUserSchema.parse(body);
 
     // Check if user exists
     const existingUser = await prisma.user.findUnique({
@@ -110,20 +120,10 @@ export async function PUT(request, { params }) {
       return sendError("User not found", ERROR_CODES.USER_NOT_FOUND, 404);
     }
 
-    // Build update data
-    const updateData = {};
-    if (name !== undefined) updateData.name = name;
-    if (role !== undefined) updateData.role = role;
-    if (avatar !== undefined) updateData.avatar = avatar;
-
-    if (Object.keys(updateData).length === 0) {
-      return sendError("No fields to update", ERROR_CODES.VALIDATION_ERROR, 400);
-    }
-
     // Update user
     const user = await prisma.user.update({
       where: { id },
-      data: updateData,
+      data: validatedData,
       select: {
         id: true,
         email: true,
@@ -137,6 +137,12 @@ export async function PUT(request, { params }) {
     return sendSuccess(user, "User updated successfully");
   } catch (error) {
     console.error("PUT /api/users/[id] error:", error);
+
+    // Handle Zod validation errors
+    if (error instanceof ZodError) {
+      return handleZodError(error);
+    }
+
     return handlePrismaError(error);
   }
 }

@@ -1,7 +1,15 @@
 import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import pkg from "pg";
-import { sendSuccess, sendError, handlePrismaError, ERROR_CODES } from "@/lib/responseHandler";
+import { ZodError } from "zod";
+import {
+  sendSuccess,
+  sendError,
+  handlePrismaError,
+  handleZodError,
+  ERROR_CODES,
+} from "@/lib/responseHandler";
+import { updateTaskSchema } from "@/lib/schemas/taskSchema";
 
 const { Pool } = pkg;
 
