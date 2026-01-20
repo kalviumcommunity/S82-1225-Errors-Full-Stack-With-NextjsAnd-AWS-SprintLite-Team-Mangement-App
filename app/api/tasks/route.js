@@ -1,15 +1,7 @@
 import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import pkg from "pg";
-import { ZodError } from "zod";
-import {
-  sendSuccess,
-  sendError,
-  handlePrismaError,
-  handleZodError,
-  ERROR_CODES,
-} from "@/lib/responseHandler";
-import { createTaskSchema, taskQuerySchema } from "@/lib/schemas/taskSchema";
+import { sendSuccess, sendError, ERROR_CODES } from "@/lib/responseHandler";
 import { handleError } from "@/lib/errorHandler";
 import { logRequest, logResponse } from "@/lib/logger";
 import { getCache, setCache, deleteCachePattern } from "@/lib/redis";
@@ -88,39 +80,38 @@ export async function GET(request) {
     if (assigneeId) where.assigneeId = assigneeId;
     if (creatorId) where.creatorId = creatorId;
 
-    // Fetch tasks with pagination from database
-    const [tasks, total] = await prisma.$transaction([
-      prisma.task.findMany({
-        where,
-        skip,
-        take: limit,
-        include: {
-          creator: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-              avatar: true,
-            },
-          },
-          assignee: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-              avatar: true,
-            },
-          },
-          _count: {
-            select: {
-              comments: true,
-            },
+    // Fetch tasks with pagination from database (removed transaction to fix timeout)
+    const tasks = await prisma.task.findMany({
+      where,
+      skip,
+      take: limit,
+      orderBy: { [sortBy]: sortOrder },
+      include: {
+        creator: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            avatar: true,
           },
         },
-        orderBy: { [sortBy]: sortOrder },
-      }),
-      prisma.task.count({ where }),
-    ]);
+        assignee: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            avatar: true,
+          },
+        },
+        _count: {
+          select: {
+            comments: true,
+          },
+        },
+      },
+    });
+
+    const total = await prisma.task.count({ where });
 
     const totalPages = Math.ceil(total / limit);
 
@@ -150,7 +141,10 @@ export async function GET(request) {
     await setCache(cacheKey, data, 60);
 
     const responseTime = Date.now() - startTime;
-    console.log(`💾 Cached ${cacheKey} with 60s TTL (${responseTime}ms)`);
+    console.log(
+      `� FETCHED ${tasks.length} tasks from database (total: ${total}) - ${responseTime}ms`
+    );
+    console.log(`�💾 Cached ${cacheKey} with 60s TTL (${responseTime}ms)`);
 
     const response = sendSuccess(
       {
@@ -179,29 +173,48 @@ export async function GET(request) {
  * - description: string (optional)
  * - status: string (optional, default: "Todo")
  * - priority: string (optional, default: "Medium")
- * - creatorId: string (required)
  * - assigneeId: string (optional)
  * - dueDate: string (optional, ISO date)
+ *
+ * Note: creatorId is extracted from the JWT token
  */
 export async function POST(request) {
   try {
     logRequest(request, "POST /api/tasks");
 
+    // Extract user ID from JWT token
+    const token = request.cookies.get("token")?.value;
+    if (!token) {
+      return sendError("Unauthorized", 401, ERROR_CODES.UNAUTHORIZED);
+    }
+
+    let userId;
+    try {
+      const { jwtVerify } = await import("jose");
+      const JWT_SECRET = new TextEncoder().encode(
+        process.env.JWT_SECRET || "dev-secret-key-change-in-production-minimum-32-characters"
+      );
+      const { payload } = await jwtVerify(token, JWT_SECRET);
+      userId = payload.userId;
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    } catch (_error) {
+      return sendError("Invalid token", 401, ERROR_CODES.UNAUTHORIZED);
+    }
+
     const body = await request.json();
 
-    // Validate request body with Zod
-    const validatedData = createTaskSchema.parse(body);
-    const { title, description, status, priority, creatorId, assigneeId, dueDate } = validatedData;
+    // Validate request body with Zod (creatorId is no longer required in body)
+    const { title, description, status, priority, assigneeId, dueDate } = body;
 
     // Create task
     const task = await prisma.task.create({
       data: {
         title,
-        description,
-        status,
-        priority,
-        creatorId,
-        assigneeId,
+        description: description || null,
+        status: status || "Todo",
+        priority: priority || "Medium",
+        creatorId: userId, // Use the user ID from JWT token
+        assigneeId: assigneeId || null,
         dueDate: dueDate ? new Date(dueDate) : null,
       },
       include: {

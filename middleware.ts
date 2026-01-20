@@ -16,18 +16,20 @@
 
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import jwt from "jsonwebtoken";
+import { jwtVerify } from "jose";
 
-const JWT_SECRET =
-  process.env.JWT_SECRET || "dev-secret-key-change-in-production-minimum-32-characters";
+const JWT_SECRET = new TextEncoder().encode(
+  process.env.JWT_SECRET || "dev-secret-key-change-in-production-minimum-32-characters"
+);
 
-export function middleware(req: NextRequest) {
+export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
   // Allow public routes
   if (
     pathname === "/" ||
     pathname === "/about" ||
+    pathname.startsWith("/auth") ||
     pathname.startsWith("/login") ||
     pathname.startsWith("/api/auth/login") ||
     pathname.startsWith("/api/auth/signup") ||
@@ -45,20 +47,27 @@ export function middleware(req: NextRequest) {
   ) {
     const token = req.cookies.get("token")?.value;
 
+    console.log("Middleware checking protected route:", pathname);
+    console.log("Token found:", token ? "YES (" + token.substring(0, 20) + "...)" : "NO");
+    console.log("All cookies:", req.cookies.getAll());
+
     if (!token) {
+      console.log("No token - redirecting to login");
       // Redirect to login with return URL
-      const loginUrl = new URL("/login", req.url);
+      const loginUrl = new URL("/auth/login", req.url);
       loginUrl.searchParams.set("returnUrl", pathname);
       return NextResponse.redirect(loginUrl);
     }
 
     try {
-      // Verify JWT token
-      jwt.verify(token, JWT_SECRET);
+      // Verify JWT token using jose (Edge Runtime compatible)
+      await jwtVerify(token, JWT_SECRET);
+      console.log("Token verified - allowing access");
       return NextResponse.next();
-    } catch {
+    } catch (error) {
+      console.log("Token invalid:", error.message);
       // Invalid token - redirect to login
-      const loginUrl = new URL("/login", req.url);
+      const loginUrl = new URL("/auth/login", req.url);
       loginUrl.searchParams.set("returnUrl", pathname);
 
       // Clear invalid token
