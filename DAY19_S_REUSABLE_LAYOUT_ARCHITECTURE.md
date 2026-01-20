@@ -1,4 +1,4 @@
-# DAY 20: Reusable Layout and Component Architecture
+# DAY 19 - SAM & MOHIT: Reusable Layout and Component Architecture
 
 ## 📋 Overview
 
