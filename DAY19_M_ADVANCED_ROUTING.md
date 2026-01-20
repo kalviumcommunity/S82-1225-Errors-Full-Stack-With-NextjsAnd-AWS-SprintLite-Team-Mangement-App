@@ -1,4 +1,4 @@
-# DAY 19: Advanced Routing with Next.js App Router
+# DAY 19 - MOHIT: Advanced Routing with Next.js App Router
 
 ## 🎯 Learning Objective
 **2.25 Advanced Routing**: Implement public/protected routing, dynamic segments, middleware-based authentication, navigation with breadcrumbs, and custom error pages using Next.js 14+ App Router.
