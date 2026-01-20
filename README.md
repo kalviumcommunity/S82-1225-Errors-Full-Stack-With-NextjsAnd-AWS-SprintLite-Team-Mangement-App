@@ -262,6 +262,333 @@ schema.prisma
 
 ---
 
+## 🔐 Environment Variables Configuration
+
+### Overview
+SprintLite uses Next.js environment variable management to handle configuration across different environments (development, staging, production). We follow security best practices to prevent accidental exposure of sensitive data.
+
+### File Structure
+
+- **`.env.local`** - Your personal secrets (NEVER commit to git)
+- **`.env.example`** - Template with placeholders (safe to commit)
+- **`.env.development`** - Shared development config (can commit)
+- **`.env.staging`** - Staging environment config (use CI/CD secrets)
+- **`.env.production`** - Production config (use cloud secret managers)
+
+### Variable Categories
+
+#### 🔒 Server-Side Only Variables (NO `NEXT_PUBLIC_` prefix)
+These variables are **NEVER** exposed to the browser and are only accessible in:
+- API routes (`/api/**`)
+- Server components
+- Server-side functions
+
+| Variable | Description | Example | Security Level |
+|----------|-------------|---------|----------------|
+| `DATABASE_URL` | PostgreSQL connection string | `postgresql://user:pass@host/db` | 🔴 CRITICAL |
+| `JWT_SECRET` | JWT signing key (min 32 chars) | `openssl rand -base64 32` | 🔴 CRITICAL |
+| `NEXTAUTH_SECRET` | NextAuth session encryption | `openssl rand -base64 32` | 🔴 CRITICAL |
+| `REDIS_URL` | Redis cache connection | `redis://localhost:6379` | 🟡 SENSITIVE |
+| `AWS_ACCESS_KEY_ID` | AWS S3/SES credentials | `AKIA...` | 🔴 CRITICAL |
+| `AWS_SECRET_ACCESS_KEY` | AWS secret key | `abc123...` | 🔴 CRITICAL |
+| `SMTP_PASSWORD` | Email service password | `your-smtp-pass` | 🔴 CRITICAL |
+| `SESSION_SECRET` | Session encryption key | `your-session-secret` | 🔴 CRITICAL |
+
+#### 🌐 Client-Side Safe Variables (`NEXT_PUBLIC_` prefix)
+These variables ARE exposed to the browser and included in the client-side JavaScript bundle:
+
+| Variable | Description | Example | Use Case |
+|----------|-------------|---------|----------|
+| `NEXT_PUBLIC_APP_ENV` | Environment identifier | `development` | Show env badge in UI |
+| `NEXT_PUBLIC_APP_URL` | Frontend base URL | `http://localhost:3000` | API calls, redirects |
+| `NEXT_PUBLIC_ENABLE_ANALYTICS` | Feature flag | `false` | Toggle analytics |
+| `NEXT_PUBLIC_ENABLE_DEBUG_MODE` | Debug logging | `true` | Client-side debugging |
+
+### Setup Instructions
+
+#### 1. Initial Setup (First Time)
+```bash
+# Copy the example file to create your local environment
+cp .env.example .env.local
+
+# Edit .env.local with your real values
+# Use a text editor to fill in actual secrets
+```
+
+#### 2. Generate Secure Secrets
+```bash
+# Generate JWT_SECRET (32+ characters)
+openssl rand -base64 32
+
+# Generate NEXTAUTH_SECRET
+openssl rand -base64 32
+
+# Generate SESSION_SECRET
+openssl rand -base64 32
+```
+
+#### 3. Verify Configuration
+```bash
+# Check if environment variables are loaded correctly
+npm run verify:dev
+
+# This will show:
+# - Which environment is active
+# - Which variables are set (without revealing values)
+# - Database connection status
+```
+
+### Security Best Practices
+
+#### ✅ DO:
+- **Use `.env.local` for local development** - It's automatically gitignored
+- **Store production secrets in cloud providers** (Vercel Env Vars, AWS Secrets Manager, Azure Key Vault)
+- **Rotate secrets regularly** - Especially after team member changes
+- **Use different secrets for each environment** - Never reuse production secrets in development
+- **Generate strong random secrets** - Use `openssl rand -base64 32` or similar
+- **Review `.gitignore`** - Ensure `.env.local` is listed
+- **Use HTTPS in production** - Protect secrets in transit
+- **Limit access to production secrets** - Only senior developers/DevOps
+
+#### ❌ DON'T:
+- **Never commit `.env.local`** - Contains real secrets
+- **Never use `NEXT_PUBLIC_` for secrets** - They're visible in browser
+- **Never hardcode secrets in code** - Always use environment variables
+- **Never share secrets via Slack/email** - Use secure secret sharing tools
+- **Never log secrets** - Even in development mode
+- **Never reuse passwords** - Each service should have unique credentials
+
+### How Next.js Handles Environment Variables
+
+#### Build Time vs Runtime
+```javascript
+// ❌ WRONG: This won't work as expected
+const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+
+// ✅ CORRECT: Variables are embedded at build time
+// If you change .env after building, you MUST rebuild
+npm run build  // Embeds current env vars
+```
+
+#### Server-Side Access
+```javascript
+// app/api/users/route.js
+export async function GET(request) {
+  // ✅ Works: Server-side API route can access server-only vars
+  const dbUrl = process.env.DATABASE_URL;
+  const jwtSecret = process.env.JWT_SECRET;
+  
+  // ✅ Also works: Can access public vars
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL;
+}
+```
+
+#### Client-Side Access
+```javascript
+// app/components/Header.jsx
+'use client';
+
+export default function Header() {
+  // ❌ FAILS: Cannot access server-only vars in client
+  const dbUrl = process.env.DATABASE_URL; // undefined
+  
+  // ✅ Works: Can access public vars
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL;
+}
+```
+
+### Preventing Accidental Leaks
+
+#### 1. Git Protection
+Our `.gitignore` is configured to block sensitive files:
+```gitignore
+# Environment files
+.env*.local      # Blocks all .env.*.local files
+.env.local       # Blocks .env.local specifically
+!.env.example    # Allows .env.example to be committed
+```
+
+#### 2. Pre-commit Hooks
+We use Husky to prevent commits with secrets:
+```json
+// package.json
+{
+  "lint-staged": {
+    "*.{js,jsx,ts,tsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ]
+  }
+}
+```
+
+#### 3. CI/CD Secret Injection
+Production secrets are injected via CI/CD, never committed:
+```yaml
+# .github/workflows/deploy.yml
+env:
+  DATABASE_URL: ${{ secrets.DATABASE_URL }}
+  JWT_SECRET: ${{ secrets.JWT_SECRET }}
+```
+
+### Disaster Recovery
+
+#### What If `.env.local` Gets Committed?
+
+**Immediate Actions:**
+1. **Remove from git history immediately:**
+   ```bash
+   # Remove file from git history
+   git filter-branch --force --index-filter \
+     'git rm --cached --ignore-unmatch .env.local' \
+     --prune-empty --tag-name-filter cat -- --all
+   
+   # Force push to rewrite history
+   git push origin --force --all
+   ```
+
+2. **Rotate ALL exposed secrets:**
+   - Change database passwords
+   - Regenerate JWT secrets
+   - Rotate API keys
+   - Update OAuth credentials
+
+3. **Notify the team:**
+   - Send security alert
+   - Provide new secrets securely
+   - Update CI/CD secrets
+
+4. **Audit access logs:**
+   - Check for unauthorized access
+   - Review database logs
+   - Monitor API usage
+
+**Prevention:**
+- Our setup prevents this with `.gitignore` protection
+- Pre-commit hooks scan for potential secrets
+- Regular security audits
+- Team training on secret management
+
+### Environment-Specific Configuration
+
+#### Development
+```bash
+# .env.local (local development)
+DATABASE_URL="postgresql://localhost:5432/sprintlite_dev"
+JWT_SECRET="dev-secret-key-change-in-production-minimum-32-characters"
+NEXT_PUBLIC_APP_ENV="development"
+NEXT_PUBLIC_APP_URL="http://localhost:3000"
+NEXT_PUBLIC_ENABLE_DEBUG_MODE="true"
+```
+
+#### Staging
+```bash
+# Injected via CI/CD (GitHub Secrets)
+DATABASE_URL="${{ secrets.STAGING_DATABASE_URL }}"
+JWT_SECRET="${{ secrets.STAGING_JWT_SECRET }}"
+NEXT_PUBLIC_APP_ENV="staging"
+NEXT_PUBLIC_APP_URL="https://staging.sprintlite.com"
+NEXT_PUBLIC_ENABLE_DEBUG_MODE="false"
+```
+
+#### Production
+```bash
+# Stored in Vercel Environment Variables / AWS Secrets Manager
+DATABASE_URL="postgresql://prod-host/sprintlite_prod"
+JWT_SECRET="<64-char-production-secret>"
+NEXT_PUBLIC_APP_ENV="production"
+NEXT_PUBLIC_APP_URL="https://sprintlite.com"
+NEXT_PUBLIC_ENABLE_DEBUG_MODE="false"
+NEXT_PUBLIC_ENABLE_ANALYTICS="true"
+```
+
+### Testing Your Setup
+
+```bash
+# 1. Verify environment variables are loaded
+npm run verify:dev
+
+# Expected output:
+# ✅ NODE_ENV: development
+# ✅ NEXT_PUBLIC_APP_ENV: development
+# ✅ NEXT_PUBLIC_APP_URL: http://localhost:3000
+# ✅ DATABASE_URL: postgresql://***:***@***/***
+# ✅ Environment configured correctly!
+
+# 2. Test database connection
+npm run test:db
+
+# 3. Check for security issues
+# Ensure .env.local is not tracked by git
+git status
+
+# Should NOT show .env.local in untracked files
+```
+
+### Troubleshooting
+
+#### Variables Not Loading
+```bash
+# 1. Check if .env.local exists
+ls -la .env.local
+
+# 2. Verify variable names (case-sensitive)
+# Make sure NEXT_PUBLIC_ prefix is correct
+
+# 3. Rebuild the app (vars are embedded at build time)
+npm run build
+
+# 4. Restart dev server
+npm run dev
+```
+
+#### Variables Showing as Undefined
+```javascript
+// Client component trying to access server-only var
+console.log(process.env.DATABASE_URL); // undefined
+
+// Solution: Add NEXT_PUBLIC_ prefix or move to server-side
+console.log(process.env.NEXT_PUBLIC_APP_URL); // works
+```
+
+### Reflection: Why This Matters
+
+**Security Impact:**
+- One leaked secret can compromise the entire application
+- Database credentials in wrong hands = data breach
+- API keys exposed = unlimited charges
+- JWT secrets leaked = account takeovers
+
+**Team Collaboration:**
+- Clear separation prevents accidents
+- New developers can onboard safely with `.env.example`
+- Environment-specific configs avoid conflicts
+- CI/CD automation reduces human error
+
+**Production Safety:**
+- Cloud secret managers provide encryption at rest
+- Automatic secret rotation
+- Audit logs for compliance
+- Disaster recovery procedures
+
+**What Could Go Wrong:**
+If a teammate accidentally pushed `.env.local` to GitHub:
+1. **Immediate exposure** - Anyone with repo access sees secrets
+2. **Persistent history** - Deleting file doesn't remove from git history
+3. **Search engines** - Public repos get indexed quickly
+4. **Automated scanners** - Bots scan GitHub for exposed credentials
+5. **Lateral movement** - One leaked secret can expose other systems
+
+**Our Defense:**
+- `.gitignore` blocks `.env.local` by default
+- Pre-commit hooks scan for secrets
+- Husky prevents committing sensitive files
+- Team training on secret management
+- Regular security audits
+- Documented recovery procedures
+
+---
+
 ## Conclusion
 
 SprintLite demonstrates how a small team can design, build, and deploy a clean, cloud-hosted web application using industry-relevant tools while maintaining simplicity and clarity. The project emphasizes fundamentals over unnecessary complexity.

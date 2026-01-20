@@ -9,11 +9,11 @@ import { signupSchema } from "@/lib/schemas/authSchema";
 import { useAuthContext } from "@/context/AuthContext";
 import Cookies from "js-cookie";
 import FormInput from "@/components/FormInput";
+import toast from "react-hot-toast";
 
 export default function SignupPage() {
   const router = useRouter();
   const { login } = useAuthContext();
-  const [error, setError] = useState("");
   const [agreeToTerms, setAgreeToTerms] = useState(false);
 
   const {
@@ -26,13 +26,13 @@ export default function SignupPage() {
   });
 
   const onSubmit = async (data) => {
-    setError("");
-
     // Validate terms agreement
     if (!agreeToTerms) {
-      setError("You must agree to the Terms of Service and Privacy Policy");
+      toast.error("You must agree to the Terms of Service and Privacy Policy");
       return;
     }
+
+    const loadingToast = toast.loading("Creating your account...");
 
     try {
       const response = await fetch("/api/auth/signup", {
@@ -65,13 +65,15 @@ export default function SignupPage() {
         // Update AuthContext
         login(result.data.user.name, result.data.user.email);
 
+        toast.success("Account created successfully! Welcome aboard!", { id: loadingToast });
+
         // Redirect to dashboard using Next.js router
-        router.push("/dashboard");
+        setTimeout(() => router.push("/dashboard"), 500);
       } else {
-        setError(result.message || "Signup failed");
+        toast.error(result.message || "Signup failed", { id: loadingToast });
       }
     } catch (err) {
-      setError("An error occurred. Please try again.");
+      toast.error("An error occurred. Please try again.", { id: loadingToast });
       console.error("Signup error:", err);
     }
   };

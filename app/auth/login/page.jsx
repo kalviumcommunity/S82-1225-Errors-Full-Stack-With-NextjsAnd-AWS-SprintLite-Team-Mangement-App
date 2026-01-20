@@ -1,17 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuthContext } from "@/context/AuthContext";
 import Cookies from "js-cookie";
+import toast from "react-hot-toast";
 
 export default function LoginPage() {
   const { login } = useAuthContext();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
-  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e) => {
@@ -19,19 +18,13 @@ export default function LoginPage() {
 
     // Prevent double submission
     if (loading) {
-      console.log("Already loading, ignoring duplicate submission");
       return;
     }
 
-    console.log("Form submitted!");
-    console.log("Email:", email);
-    console.log("Password:", password);
-
-    setError("");
     setLoading(true);
+    const loadingToast = toast.loading("Signing you in...");
 
     try {
-      console.log("Sending login request...");
       const response = await fetch("/api/auth/login", {
         method: "POST",
         headers: {
@@ -43,15 +36,9 @@ export default function LoginPage() {
 
       const data = await response.json();
 
-      console.log("Login response:", data);
-
       if (data.success && data.data) {
-        console.log("Login successful!");
-        console.log("Token:", data.data.token.substring(0, 20) + "...");
-
         // Store token in localStorage
         localStorage.setItem("token", data.data.token);
-        console.log("Token saved to localStorage");
 
         // Store user info in cookie for display
         const expireDays = rememberMe ? 7 : 1;
@@ -60,7 +47,6 @@ export default function LoginPage() {
           path: "/",
           sameSite: "lax",
         });
-        console.log("User cookie set");
 
         // Also set token cookie for middleware (non-httpOnly for now)
         Cookies.set("token", data.data.token, {
@@ -68,22 +54,20 @@ export default function LoginPage() {
           path: "/",
           sameSite: "lax",
         });
-        console.log("Token cookie set:", Cookies.get("token") ? "SUCCESS" : "FAILED");
 
         // Update AuthContext
         login(data.data.user.name, data.data.user.email);
-        console.log("AuthContext updated");
 
-        console.log("Waiting 500ms before redirect...");
+        toast.success("Welcome back! Redirecting...", { id: loadingToast });
+
         setTimeout(() => {
-          console.log("Redirecting to dashboard NOW");
           window.location.href = "/dashboard";
         }, 500);
       } else {
-        setError(data.message || "Login failed");
+        toast.error(data.message || "Login failed", { id: loadingToast });
       }
     } catch (err) {
-      setError("An error occurred. Please try again.");
+      toast.error("An error occurred. Please try again.", { id: loadingToast });
       console.error("Login error:", err);
     } finally {
       setLoading(false);
