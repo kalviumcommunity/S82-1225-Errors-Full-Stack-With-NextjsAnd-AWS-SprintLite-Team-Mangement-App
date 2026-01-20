@@ -1,15 +1,11 @@
 import { ZodError } from "zod";
 import bcrypt from "bcryptjs";
+import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
 import { prisma } from "@/lib/db";
 import { signAuthToken } from "@/lib/auth";
 import { signupSchema } from "@/lib/schemas/authSchema";
-import {
-  sendSuccess,
-  sendError,
-  handlePrismaError,
-  handleZodError,
-  ERROR_CODES,
-} from "@/lib/responseHandler";
+import { sendError, handlePrismaError, handleZodError, ERROR_CODES } from "@/lib/responseHandler";
 
 export async function POST(request) {
   try {
@@ -37,7 +33,24 @@ export async function POST(request) {
 
     const token = signAuthToken({ userId: user.id, email: user.email, role: user.role });
 
-    return sendSuccess({ user, token }, "Signup successful", 201);
+    // Set cookie using next/headers cookies function
+    const cookieStore = await cookies();
+    cookieStore.set("token", token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 60 * 60 * 24 * 7, // 7 days
+      path: "/",
+    });
+
+    return NextResponse.json(
+      {
+        success: true,
+        data: { user, token },
+        message: "Signup successful",
+      },
+      { status: 201 }
+    );
   } catch (error) {
     if (error instanceof ZodError) {
       return handleZodError(error);

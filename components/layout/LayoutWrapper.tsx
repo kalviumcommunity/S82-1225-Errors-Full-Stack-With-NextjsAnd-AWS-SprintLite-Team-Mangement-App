@@ -37,10 +37,11 @@ export default function LayoutWrapper({
 }: LayoutWrapperProps) {
   const pathname = usePathname();
 
-  // Hide sidebar and header on login/auth pages
+  // Hide sidebar and header on login/auth pages and home page
   const isAuthPage = pathname === "/login" || pathname.startsWith("/auth/");
-  const shouldShowSidebar = showSidebar && !isAuthPage;
-  const shouldShowHeader = showHeader && !isAuthPage;
+  const isHomePage = pathname === "/";
+  const shouldShowSidebar = showSidebar && !isAuthPage && !isHomePage;
+  const shouldShowHeader = showHeader && !isAuthPage && !isHomePage;
 
   return (
     <div className="flex flex-col min-h-screen bg-gray-50">
@@ -67,7 +68,7 @@ export default function LayoutWrapper({
       </div>
 
       {/* Footer (optional) */}
-      {!isAuthPage && (
+      {!isAuthPage && !isHomePage && (
         <footer className="bg-white border-t border-gray-200 py-4 px-6" role="contentinfo">
           <div className="max-w-7xl mx-auto text-center text-sm text-gray-600">
             <p>© {new Date().getFullYear()} SprintLite. Built with Next.js App Router.</p>

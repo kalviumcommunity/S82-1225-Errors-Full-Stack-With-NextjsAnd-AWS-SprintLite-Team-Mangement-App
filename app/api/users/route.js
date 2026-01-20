@@ -30,10 +30,11 @@ export async function GET(request) {
   try {
     logRequest(request, "GET /api/users");
 
-    const authResult = authenticateRequest(request);
-    if (authResult.errorResponse) {
-      return authResult.errorResponse;
-    }
+    // Authentication is optional for user listing (for task assignment dropdown)
+    // const authResult = authenticateRequest(request);
+    // if (authResult.errorResponse) {
+    //   return authResult.errorResponse;
+    // }
 
     const { searchParams } = new URL(request.url);
 
