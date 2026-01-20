@@ -21,7 +21,9 @@
     "verify:staging": "env-cmd -f .env.staging node scripts/verify-env.js",
     "verify:prod": "env-cmd -f .env.production node scripts/verify-env.js",
     "db:seed": "node prisma/seed.mjs",
-    "prepare": "husky"
+    "prepare": "husky",
+    "storybook": "storybook dev -p 6006",
+    "build-storybook": "storybook build"
   },
   "prisma": {
     "seed": "node prisma/seed.mjs"
@@ -56,7 +58,20 @@
     "eslint-plugin-prettier": "^5.5.4",
     "husky": "^9.1.7",
     "lint-staged": "^16.2.7",
-    "tailwindcss": "^4"
+    "tailwindcss": "^4",
+    "storybook": "^10.1.11",
+    "@storybook/nextjs-vite": "^10.1.11",
+    "@chromatic-com/storybook": "^5.0.0",
+    "@storybook/addon-vitest": "^10.1.11",
+    "@storybook/addon-a11y": "^10.1.11",
+    "@storybook/addon-docs": "^10.1.11",
+    "@storybook/addon-onboarding": "^10.1.11",
+    "vite": "^7.3.1",
+    "eslint-plugin-storybook": "^10.1.11",
+    "vitest": "^4.0.17",
+    "playwright": "^1.57.0",
+    "@vitest/browser-playwright": "^4.0.17",
+    "@vitest/coverage-v8": "^4.0.17"
   },
   "lint-staged": {
     "*.{js,jsx,ts,tsx}": [
