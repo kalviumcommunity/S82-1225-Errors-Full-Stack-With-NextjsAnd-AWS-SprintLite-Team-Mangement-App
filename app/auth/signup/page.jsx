@@ -2,42 +2,37 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { signupSchema } from "@/lib/schemas/authSchema";
 import { useAuthContext } from "@/context/AuthContext";
 import Cookies from "js-cookie";
+import FormInput from "@/components/FormInput";
 
 export default function SignupPage() {
+  const router = useRouter();
   const { login } = useAuthContext();
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [agreeToTerms, setAgreeToTerms] = useState(false);
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [agreeToTerms, setAgreeToTerms] = useState(false);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm({
+    resolver: zodResolver(signupSchema),
+    mode: "onChange", // Validate on change for real-time feedback
+  });
+
+  const onSubmit = async (data) => {
     setError("");
-
-    // Validate password match
-    if (password !== confirmPassword) {
-      setError("Passwords do not match");
-      return;
-    }
-
-    // Validate password length
-    if (password.length < 8) {
-      setError("Password must be at least 8 characters");
-      return;
-    }
 
     // Validate terms agreement
     if (!agreeToTerms) {
       setError("You must agree to the Terms of Service and Privacy Policy");
       return;
     }
-
-    setLoading(true);
 
     try {
       const response = await fetch("/api/auth/signup", {
@@ -46,40 +41,38 @@ export default function SignupPage() {
           "Content-Type": "application/json",
         },
         credentials: "include",
-        body: JSON.stringify({ name, email, password }),
+        body: JSON.stringify(data),
       });
 
-      const data = await response.json();
+      const result = await response.json();
 
-      if (data.success && data.data) {
+      if (result.success && result.data) {
         // Store token in localStorage
-        localStorage.setItem("token", data.data.token);
+        localStorage.setItem("token", result.data.token);
 
         // Store user info and token in cookies
-        Cookies.set("user", JSON.stringify(data.data.user), {
+        Cookies.set("user", JSON.stringify(result.data.user), {
           expires: 7,
           path: "/",
           sameSite: "lax",
         });
-        Cookies.set("token", data.data.token, {
+        Cookies.set("token", result.data.token, {
           expires: 7,
           path: "/",
           sameSite: "lax",
         });
 
         // Update AuthContext
-        login(data.data.user.name, data.data.user.email);
+        login(result.data.user.name, result.data.user.email);
 
-        // Redirect to dashboard
-        window.location.href = "/dashboard";
+        // Redirect to dashboard using Next.js router
+        router.push("/dashboard");
       } else {
-        setError(data.message || "Signup failed");
+        setError(result.message || "Signup failed");
       }
     } catch (err) {
       setError("An error occurred. Please try again.");
       console.error("Signup error:", err);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -113,7 +106,7 @@ export default function SignupPage() {
           <h2 className="text-xl font-semibold text-white mb-2">Create your account</h2>
         </div>
 
-        <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
+        <form className="mt-6 space-y-4" onSubmit={handleSubmit(onSubmit)}>
           {error && (
             <div className="rounded-lg bg-red-900/20 border border-red-800 p-3">
               <div className="text-sm text-red-400">{error}</div>
@@ -121,75 +114,34 @@ export default function SignupPage() {
           )}
 
           <div className="space-y-4">
-            <div>
-              <label htmlFor="name" className="block text-sm font-medium text-gray-300 mb-2">
-                Full Name
-              </label>
-              <input
-                id="name"
-                name="name"
-                type="text"
-                required
-                className="w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="John Developer"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-              />
-            </div>
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-2">
-                Email
-              </label>
-              <input
-                id="email"
-                name="email"
-                type="email"
-                autoComplete="email"
-                required
-                className="w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="you@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-              />
-            </div>
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-300 mb-2">
-                Password
-              </label>
-              <input
-                id="password"
-                name="password"
-                type="password"
-                autoComplete="new-password"
-                required
-                className="w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="Create a strong password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
-              <p className="mt-1 text-xs text-gray-500">
-                At least 8 characters, 1 uppercase, 1 number
-              </p>
-            </div>
-            <div>
-              <label
-                htmlFor="confirmPassword"
-                className="block text-sm font-medium text-gray-300 mb-2"
-              >
-                Confirm Password
-              </label>
-              <input
-                id="confirmPassword"
-                name="confirmPassword"
-                type="password"
-                autoComplete="new-password"
-                required
-                className="w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="Confirm your password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-              />
-            </div>
+            <FormInput
+              label="Full Name"
+              name="name"
+              type="text"
+              register={register}
+              error={errors.name?.message}
+              placeholder="John Developer"
+            />
+
+            <FormInput
+              label="Email"
+              name="email"
+              type="email"
+              register={register}
+              error={errors.email?.message}
+              placeholder="you@example.com"
+              autoComplete="email"
+            />
+
+            <FormInput
+              label="Password"
+              name="password"
+              type="password"
+              register={register}
+              error={errors.password?.message}
+              placeholder="Create a strong password"
+              autoComplete="new-password"
+            />
           </div>
 
           <div className="flex items-start">
@@ -216,10 +168,10 @@ export default function SignupPage() {
           <div>
             <button
               type="submit"
-              disabled={loading}
+              disabled={isSubmitting}
               className="w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg"
             >
-              {loading ? "Creating account..." : "Create your workspace"}
+              {isSubmitting ? "Creating account..." : "Create your workspace"}
             </button>
           </div>
         </form>
