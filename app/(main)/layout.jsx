@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useAuthContext } from "@/context/AuthContext";
+import ThemeToggle from "@/components/ThemeToggle";
 
 export default function DashboardLayout({ children }) {
   const { user, logout } = useAuthContext();
@@ -22,18 +23,18 @@ export default function DashboardLayout({ children }) {
   };
 
   return (
-    <div className="min-h-screen bg-gray-950 flex">
-      {/* Sidebar */}
-      <aside className="w-64 bg-gray-900 border-r border-gray-800 flex flex-col">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex flex-col lg:flex-row">
+      {/* Sidebar - Hidden on mobile, visible on lg+ */}
+      <aside className="hidden lg:flex lg:w-64 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 flex-col">
         {/* Logo */}
-        <div className="p-6 border-b border-gray-800">
+        <div className="p-6 border-b border-gray-200 dark:border-gray-800">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center">
+            <div className="w-10 h-10 bg-brand rounded-lg flex items-center justify-center">
               <span className="text-white text-xl">⚡</span>
             </div>
             <div>
-              <h1 className="text-white font-bold">SprintLite</h1>
-              <p className="text-gray-500 text-xs">Your workspace</p>
+              <h1 className="text-gray-900 dark:text-white font-bold">SprintLite</h1>
+              <p className="text-gray-500 dark:text-gray-500 text-xs">Your workspace</p>
             </div>
           </div>
         </div>
@@ -42,7 +43,7 @@ export default function DashboardLayout({ children }) {
         <nav className="flex-1 p-4 space-y-2">
           <Link
             href="/dashboard"
-            className="flex items-center gap-3 px-4 py-3 text-white bg-gray-800 rounded-lg hover:bg-gray-750 transition-colors"
+            className="flex items-center gap-3 px-4 py-3 text-gray-900 dark:text-white bg-gray-100 dark:bg-gray-800 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-750 transition-colors"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
@@ -57,7 +58,7 @@ export default function DashboardLayout({ children }) {
 
           <Link
             href="/tasks"
-            className="flex items-center gap-3 px-4 py-3 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
+            className="flex items-center gap-3 px-4 py-3 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
@@ -72,7 +73,7 @@ export default function DashboardLayout({ children }) {
 
           <Link
             href="/tasks/new"
-            className="w-full flex items-center gap-3 px-4 py-3 text-blue-500 hover:bg-gray-800 rounded-lg transition-colors"
+            className="w-full flex items-center gap-3 px-4 py-3 text-brand hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
@@ -87,10 +88,10 @@ export default function DashboardLayout({ children }) {
         </nav>
 
         {/* Settings at Bottom */}
-        <div className="p-4 border-t border-gray-800">
+        <div className="p-4 border-t border-gray-200 dark:border-gray-800">
           <Link
             href="/settings"
-            className="flex items-center gap-3 px-4 py-3 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
+            className="flex items-center gap-3 px-4 py-3 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
@@ -113,37 +114,52 @@ export default function DashboardLayout({ children }) {
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col">
-        {/* Top Bar */}
-        <header className="h-16 bg-gray-900 border-b border-gray-800 flex items-center justify-between px-6">
-          {/* Search */}
-          <div className="flex-1 max-w-md">
+        {/* Top Bar - Mobile friendly */}
+        <header className="h-16 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between px-4 lg:px-6">
+          {/* Search - Hidden on mobile, visible on md+ */}
+          <div className="hidden md:flex flex-1 max-w-md">
             <input
               type="search"
               placeholder="Search tasks..."
-              className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-4 py-2 bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-brand"
             />
           </div>
 
+          {/* Mobile: Logo */}
+          <div className="flex lg:hidden items-center gap-2">
+            <div className="w-8 h-8 bg-brand rounded-lg flex items-center justify-center">
+              <span className="text-white text-lg">⚡</span>
+            </div>
+            <h1 className="text-gray-900 dark:text-white font-bold">SprintLite</h1>
+          </div>
+
           {/* User Menu */}
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 lg:gap-4">
+            {/* Theme Toggle */}
+            <ThemeToggle />
+
             {/* User Avatar */}
             <button
               onClick={handleLogout}
-              className="flex items-center gap-2 hover:bg-gray-800 rounded-lg px-3 py-2 transition-colors"
+              className="flex items-center gap-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg px-2 lg:px-3 py-2 transition-colors"
             >
-              <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white font-semibold text-sm">
+              <div className="w-8 h-8 bg-brand rounded-full flex items-center justify-center text-white font-semibold text-sm">
                 {getInitials(user?.name)}
               </div>
-              <div className="text-left">
-                <p className="text-white text-sm font-medium">{user?.name || "User"}</p>
-                <p className="text-gray-400 text-xs">{user?.email || "user@example.com"}</p>
+              <div className="hidden lg:block text-left">
+                <p className="text-gray-900 dark:text-white text-sm font-medium">
+                  {user?.name || "User"}
+                </p>
+                <p className="text-gray-500 dark:text-gray-400 text-xs">
+                  {user?.email || "user@example.com"}
+                </p>
               </div>
             </button>
           </div>
         </header>
 
         {/* Page Content */}
-        <main className="flex-1 overflow-auto">{children}</main>
+        <main className="flex-1 overflow-auto bg-gray-50 dark:bg-gray-950">{children}</main>
       </div>
     </div>
   );
