@@ -7,6 +7,7 @@ import { logRequest, logResponse } from "@/lib/logger";
 import { getCache, setCache, deleteCachePattern } from "@/lib/redis";
 import { requirePermission } from "@/lib/rbac-middleware";
 import { RESOURCES, ACTIONS } from "@/lib/rbac";
+import { validateRequestBody, detectXSS, detectSQLi, logSecurityThreat } from "@/lib/sanitization";
 
 const { Pool } = pkg;
 
@@ -207,10 +208,74 @@ export async function POST(request) {
 
     const body = await request.json();
 
-    // Validate request body with Zod (creatorId is no longer required in body)
-    const { title, description, status, priority, assigneeId, dueDate } = body;
+    // 🛡️ SECURITY: Validate and sanitize input
+    const validation = validateRequestBody(body, {
+      title: {
+        type: "plain",
+        required: true,
+        minLength: 3,
+        maxLength: 100,
+        checkXSS: true,
+      },
+      description: {
+        type: "rich",
+        required: false,
+        maxLength: 5000,
+      },
+      status: {
+        type: "plain",
+        required: false,
+        maxLength: 20,
+      },
+      priority: {
+        type: "plain",
+        required: false,
+        maxLength: 20,
+      },
+      assigneeId: {
+        type: "none",
+        required: false,
+      },
+      dueDate: {
+        type: "none",
+        required: false,
+      },
+    });
 
-    // Create task
+    if (!validation.valid) {
+      console.error("[SECURITY] Task validation failed:", validation.errors);
+      return sendError("Validation failed", 400, ERROR_CODES.VALIDATION_ERROR, validation.errors);
+    }
+
+    const { title, description, status, priority, assigneeId, dueDate } = validation.data;
+
+    // 🛡️ SECURITY: Additional XSS/SQLi detection logging
+    const xssCheck = detectXSS(title + (description || ""));
+    const sqliCheck = detectSQLi(title + (description || ""));
+
+    if (!xssCheck.safe) {
+      logSecurityThreat("XSS_ATTEMPT", {
+        userId: user.id,
+        userEmail: user.email,
+        endpoint: "/api/tasks",
+        method: "POST",
+        threats: xssCheck.threats,
+        input: { title, description },
+      });
+    }
+
+    if (!sqliCheck.safe) {
+      logSecurityThreat("SQLI_ATTEMPT", {
+        userId: user.id,
+        userEmail: user.email,
+        endpoint: "/api/tasks",
+        method: "POST",
+        threats: sqliCheck.threats,
+        input: { title, description },
+      });
+    }
+
+    // Create task with sanitized data
     const task = await prisma.task.create({
       data: {
         title,
