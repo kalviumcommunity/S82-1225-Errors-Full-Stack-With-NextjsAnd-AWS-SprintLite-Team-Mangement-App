@@ -4,6 +4,7 @@ import useSWR from "swr";
 import { fetcher } from "@/lib/fetcher";
 import Link from "next/link";
 import { useState } from "react";
+import Loader from "@/components/Loader";
 
 /**
  * All Tasks Page - Table View
@@ -25,11 +26,8 @@ export default function AllTasksPage() {
 
   if (isLoading) {
     return (
-      <div className="p-8">
-        <div className="animate-pulse">
-          <div className="h-8 bg-gray-700 rounded w-1/4 mb-4"></div>
-          <div className="h-96 bg-gray-800 rounded"></div>
-        </div>
+      <div className="p-8 flex items-center justify-center min-h-[400px]">
+        <Loader size="lg" text="Loading tasks..." />
       </div>
     );
   }

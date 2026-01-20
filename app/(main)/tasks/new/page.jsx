@@ -4,14 +4,14 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import useSWR from "swr";
 import { fetcher } from "@/lib/fetcher";
+import toast from "react-hot-toast";
 
 export default function CreateTaskPage() {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState("");
 
   // Fetch users for assignee dropdown (handle errors gracefully)
-  const { data: usersData, error: _usersError } = useSWR("/api/users?limit=100", fetcher, {
+  const { data: usersData } = useSWR("/api/users?limit=100", fetcher, {
     revalidateOnFocus: false,
     shouldRetryOnError: false,
   });
@@ -33,8 +33,10 @@ export default function CreateTaskPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError("");
     setIsSubmitting(true);
+
+    // Show loading toast
+    const loadingToast = toast.loading("Creating task...");
 
     try {
       // Get the actual logged-in user's ID from the token
@@ -61,10 +63,14 @@ export default function CreateTaskPage() {
         throw new Error(data.message || "Failed to create task");
       }
 
-      // Redirect to dashboard
-      router.push("/dashboard");
+      // Dismiss loading and show success
+      toast.success("Task created successfully!", { id: loadingToast });
+
+      // Redirect to dashboard after short delay
+      setTimeout(() => router.push("/dashboard"), 500);
     } catch (err) {
-      setError(err.message);
+      // Dismiss loading and show error
+      toast.error(err.message || "Failed to create task", { id: loadingToast });
       setIsSubmitting(false);
     }
   };
@@ -80,13 +86,6 @@ export default function CreateTaskPage() {
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Error Message */}
-          {error && (
-            <div className="bg-red-900/50 border border-red-700 rounded-lg p-4">
-              <p className="text-red-300">{error}</p>
-            </div>
-          )}
-
           {/* Title */}
           <div>
             <label htmlFor="title" className="block text-sm font-medium text-gray-300 mb-2">
