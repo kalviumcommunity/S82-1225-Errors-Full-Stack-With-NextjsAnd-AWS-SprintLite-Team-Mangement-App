@@ -70,23 +70,22 @@ function uiReducer(state, action) {
   }
 }
 
-const initialState = {
-  theme: "light",
+// Get initial theme from localStorage (client-side only)
+function getInitialTheme() {
+  if (typeof window === "undefined") return "dark"; // Default to dark for SSR
+  const savedTheme = localStorage.getItem("theme");
+  return savedTheme === "light" || savedTheme === "dark" ? savedTheme : "dark";
+}
+
+const getInitialState = () => ({
+  theme: getInitialTheme(),
   sidebarOpen: false,
   modalOpen: false,
   notifications: [],
-};
+});
 
 export function UIProvider({ children }) {
-  const [state, dispatch] = useReducer(uiReducer, initialState);
-
-  // Load theme preference from localStorage on mount
-  useEffect(() => {
-    const savedTheme = localStorage.getItem("theme");
-    if (savedTheme && (savedTheme === "light" || savedTheme === "dark")) {
-      dispatch({ type: "SET_THEME", payload: savedTheme });
-    }
-  }, []);
+  const [state, dispatch] = useReducer(uiReducer, getInitialState());
 
   // Persist theme to localStorage
   useEffect(() => {
