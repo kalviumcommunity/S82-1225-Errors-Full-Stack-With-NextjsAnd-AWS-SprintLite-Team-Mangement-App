@@ -5,6 +5,8 @@ import { sendSuccess, sendError, ERROR_CODES } from "@/lib/responseHandler";
 import { handleError } from "@/lib/errorHandler";
 import { logRequest, logResponse } from "@/lib/logger";
 import { getCache, setCache, deleteCachePattern } from "@/lib/redis";
+import { requirePermission } from "@/lib/rbac-middleware";
+import { RESOURCES, ACTIONS } from "@/lib/rbac";
 
 const { Pool } = pkg;
 
@@ -30,6 +32,16 @@ export async function GET(request) {
   const startTime = Date.now();
 
   try {
+    // RBAC: Check if user has read permission for tasks
+    const authResult = await requirePermission(request, RESOURCES.TASKS, ACTIONS.READ);
+    if (authResult.errorResponse) {
+      console.log(`[RBAC] Access denied to GET /api/tasks`);
+      return authResult.errorResponse;
+    }
+
+    const { user } = authResult;
+    console.log(`[RBAC] User ${user.email} (${user.role}) accessing GET /api/tasks`);
+
     const { searchParams } = new URL(request.url);
 
     // Pagination
@@ -182,24 +194,16 @@ export async function POST(request) {
   try {
     logRequest(request, "POST /api/tasks");
 
-    // Extract user ID from JWT token
-    const token = request.cookies.get("token")?.value;
-    if (!token) {
-      return sendError("Unauthorized", 401, ERROR_CODES.UNAUTHORIZED);
+    // RBAC: Check if user has create permission for tasks
+    const authResult = await requirePermission(request, RESOURCES.TASKS, ACTIONS.CREATE);
+    if (authResult.errorResponse) {
+      console.log(`[RBAC] Access denied to POST /api/tasks`);
+      return authResult.errorResponse;
     }
 
-    let userId;
-    try {
-      const { jwtVerify } = await import("jose");
-      const JWT_SECRET = new TextEncoder().encode(
-        process.env.JWT_SECRET || "dev-secret-key-change-in-production-minimum-32-characters"
-      );
-      const { payload } = await jwtVerify(token, JWT_SECRET);
-      userId = payload.userId;
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    } catch (_error) {
-      return sendError("Invalid token", 401, ERROR_CODES.UNAUTHORIZED);
-    }
+    const { user } = authResult;
+    const userId = user.id;
+    console.log(`[RBAC] User ${user.email} (${user.role}) creating task`);
 
     const body = await request.json();
 
