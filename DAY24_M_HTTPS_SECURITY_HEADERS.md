@@ -31,6 +31,7 @@ This project demonstrates how to enforce HTTPS and configure secure HTTP headers
 - **Purpose:** Only allows trusted origins, methods, and headers to access API routes, preventing unauthorized cross-origin requests.
 - **How:** Configured in `lib/cors.js` and applied to API routes.
 
+
 ### 4. Additional Security Headers
 - `X-Frame-Options: DENY` (prevents clickjacking)
 - `X-Content-Type-Options: nosniff` (prevents MIME sniffing)
