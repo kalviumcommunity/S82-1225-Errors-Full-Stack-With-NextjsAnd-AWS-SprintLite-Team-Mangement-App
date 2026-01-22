@@ -28,6 +28,7 @@ This project demonstrates how to enforce HTTPS and configure secure HTTP headers
   Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With, Accept, Origin
   Access-Control-Allow-Credentials: true
   ```
+  
 - **Purpose:** Only allows trusted origins, methods, and headers to access API routes, preventing unauthorized cross-origin requests.
 - **How:** Configured in `lib/cors.js` and applied to API routes.
 
