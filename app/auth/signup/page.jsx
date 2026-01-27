@@ -15,6 +15,7 @@ export default function SignupPage() {
   const router = useRouter();
   const { login } = useAuthContext();
   const [agreeToTerms, setAgreeToTerms] = useState(false);
+  const [error, setError] = useState("");
 
   const {
     register,
@@ -26,6 +27,7 @@ export default function SignupPage() {
   });
 
   const onSubmit = async (data) => {
+    setError("");
     // Validate terms agreement
     if (!agreeToTerms) {
       toast.error("You must agree to the Terms of Service and Privacy Policy");
@@ -70,9 +72,11 @@ export default function SignupPage() {
         // Redirect to dashboard using Next.js router
         setTimeout(() => router.push("/dashboard"), 500);
       } else {
+        setError(result.message || "Signup failed");
         toast.error(result.message || "Signup failed", { id: loadingToast });
       }
     } catch (err) {
+      setError("An error occurred. Please try again.");
       toast.error("An error occurred. Please try again.", { id: loadingToast });
       console.error("Signup error:", err);
     }
