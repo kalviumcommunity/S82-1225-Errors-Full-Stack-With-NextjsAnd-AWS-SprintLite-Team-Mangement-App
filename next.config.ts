@@ -1,5 +1,7 @@
 import type { NextConfig } from "next";
 
+const DOMAIN = process.env.NEXT_PUBLIC_DOMAIN || "sprintlite-app.com";
+
 const nextConfig: NextConfig = {
   /* config options here */
 
@@ -9,6 +11,36 @@ const nextConfig: NextConfig = {
   // Optimize for production
   compress: true,
   poweredByHeader: false,
+
+  // HTTPS Redirects & Domain Enforcement
+  async redirects() {
+    return [
+      // Redirect HTTP to HTTPS for root domain
+      {
+        source: "/(.*)",
+        has: [
+          {
+            type: "host",
+            value: DOMAIN,
+          },
+        ],
+        destination: `https://${DOMAIN}/:path*`,
+        permanent: true, // HTTP 301
+      },
+      // Redirect www to non-www (professional standard)
+      {
+        source: "/(.*)",
+        has: [
+          {
+            type: "host",
+            value: `www.${DOMAIN}`,
+          },
+        ],
+        destination: `https://${DOMAIN}/:path*`,
+        permanent: true,
+      },
+    ];
+  },
 
   // Security Headers
   async headers() {
