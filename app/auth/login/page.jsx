@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useAuthContext } from "@/context/AuthContext";
 import Cookies from "js-cookie";
 import toast from "react-hot-toast";
+import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
   const { login } = useAuthContext();
@@ -12,8 +13,11 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const router = useRouter();
 
   const handleSubmit = async (e) => {
+    setError("");
     e.preventDefault();
 
     // Prevent double submission
@@ -48,25 +52,28 @@ export default function LoginPage() {
           sameSite: "lax",
         });
 
-        // Also set token cookie for middleware (non-httpOnly for now)
-        Cookies.set("token", data.data.token, {
+        // Set accessToken cookie for middleware (real JWT)
+        Cookies.set("accessToken", data.data.token, {
           expires: expireDays,
           path: "/",
           sameSite: "lax",
         });
+        // Remove mock token cookie if present
+        Cookies.remove("token");
 
         // Update AuthContext
         login(data.data.user.name, data.data.user.email);
 
         toast.success("Welcome back! Redirecting...", { id: loadingToast });
-
         setTimeout(() => {
-          window.location.href = "/dashboard";
+          router.push("/dashboard");
         }, 500);
       } else {
+        setError(data.message || "Login failed");
         toast.error(data.message || "Login failed", { id: loadingToast });
       }
     } catch (err) {
+      setError("An error occurred. Please try again.");
       toast.error("An error occurred. Please try again.", { id: loadingToast });
       console.error("Login error:", err);
     } finally {

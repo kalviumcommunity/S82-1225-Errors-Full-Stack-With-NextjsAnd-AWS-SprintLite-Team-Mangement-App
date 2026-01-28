@@ -8,6 +8,18 @@ const s3 = new aws.S3({
   },
 });
 
+// Optionally, load AWS credentials from cloud secret manager at runtime
+// import { getCloudSecrets } from '../../../lib/cloudSecrets';
+// (async () => {
+//   if (!process.env.AWS_ACCESS_KEY_ID || !process.env.AWS_SECRET_ACCESS_KEY) {
+//     const secrets = await getCloudSecrets();
+//     process.env.AWS_ACCESS_KEY_ID = secrets.AWS_ACCESS_KEY_ID;
+//     process.env.AWS_SECRET_ACCESS_KEY = secrets.AWS_SECRET_ACCESS_KEY;
+//     process.env.AWS_REGION = secrets.AWS_REGION;
+//     process.env.AWS_BUCKET_NAME = secrets.AWS_BUCKET_NAME;
+//   }
+// })();
+
 export default async function handler(req, res) {
   if (req.method !== "GET") {
     res.status(405).json({ error: "Method not allowed" });

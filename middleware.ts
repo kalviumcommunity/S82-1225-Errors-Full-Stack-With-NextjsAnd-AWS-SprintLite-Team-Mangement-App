@@ -98,7 +98,8 @@ export async function middleware(req: NextRequest) {
     pathname.startsWith("/users") ||
     pathname.startsWith("/tasks-overview")
   ) {
-    const token = req.cookies.get("token")?.value;
+    // Use accessToken cookie (real JWT) instead of token
+    const token = req.cookies.get("accessToken")?.value;
 
     console.log("Middleware checking protected route:", pathname);
     console.log("Token found:", token ? "YES (" + token.substring(0, 20) + "...)" : "NO");
@@ -128,7 +129,11 @@ export async function middleware(req: NextRequest) {
       });
       return response;
     } catch (error) {
-      console.log("Token invalid:", error.message);
+      let errorMsg = "Unknown error";
+      if (error && typeof error === "object" && "message" in error) {
+        errorMsg = error.message as string;
+      }
+      console.log("Token invalid:", errorMsg);
       // Invalid token - redirect to login
       const loginUrl = new URL("/auth/login", req.url);
       loginUrl.searchParams.set("returnUrl", pathname);
