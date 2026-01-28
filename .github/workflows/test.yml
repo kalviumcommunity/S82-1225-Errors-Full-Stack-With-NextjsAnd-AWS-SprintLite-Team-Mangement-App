@@ -2,9 +2,9 @@ name: Unit Tests
 
 on:
   push:
-    branches: [main, develop, "DAY27-S/UNIT-TESTING"]
+    branches: [main, develop, DAY27-S/UNIT-TESTING]
   pull_request:
-    branches: [main, develop, "DAY27-S/UNIT-TESTING"]
+    branches: [main, develop, DAY27-S/UNIT-TESTING]
 
 jobs:
   test:
@@ -21,13 +21,13 @@ jobs:
         uses: actions/setup-node@v3
         with:
           node-version: ${{ matrix.node-version }}
-          cache: "npm"
+          cache: npm
 
       - name: Install dependencies
         run: npm ci
 
       - name: Run Unit Tests
-        run: npm test -- --passWithNoTests
+        run: npm test
 
       - name: Generate Coverage Report
         run: npm run test:coverage
@@ -38,28 +38,3 @@ jobs:
         with:
           name: coverage-report-${{ matrix.node-version }}
           path: coverage/
-
-      - name: Comment PR with Coverage
-        if: github.event_name == 'pull_request'
-        uses: actions/github-script@v6
-        with:
-          script: |
-            const fs = require('fs');
-            const coverage = fs.readFileSync('coverage/coverage-summary.json', 'utf8');
-            const summary = JSON.parse(coverage).total;
-            
-            const comment = `
-            ## ✅ Test Results
-            - **Tests**: All passed ✓
-            - **Statements**: ${summary.lines.pct}%
-            - **Branches**: ${summary.branches.pct}%
-            - **Functions**: ${summary.functions.pct}%
-            - **Lines**: ${summary.lines.pct}%
-            `;
-            
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: comment
-            });
