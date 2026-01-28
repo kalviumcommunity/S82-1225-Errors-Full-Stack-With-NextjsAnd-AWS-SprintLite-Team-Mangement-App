@@ -188,7 +188,51 @@ curl -X POST http://localhost:3000/api/users \
 ---
 
 ### 🧪 Testing
-- New script: `scripts/test-zod-validation.js` (sample cURL-style tests to assert validation success/failure)
+
+#### Unit Testing with Jest & React Testing Library
+
+We use **Jest** and **React Testing Library (RTL)** for unit testing components and utilities.
+
+**Setup & Scripts**
+- Install: `npm install --save-dev jest @testing-library/react @testing-library/jest-dom @testing-library/user-event ts-jest jest-environment-jsdom`
+- Run tests: `npm test`
+- Watch mode: `npm run test:watch`
+- Coverage report: `npm run test:coverage`
+
+**Configuration Files**
+- `jest.config.js` — Jest configuration with jsdom environment, RTL matchers, and coverage collection
+- `jest.setup.js` — Initializes RTL matchers globally
+
+**Current Test Coverage**
+- ✅ 9 tests passing (utilities + components)
+- ✅ Validation utilities: 53.33% coverage
+- ✅ Button component: 100% coverage
+- Test files: `__tests__/validation.test.js`, `__tests__/Button.test.jsx`
+
+**Example Test Structure**
+```javascript
+// Unit test for a utility function
+test('validates email correctly', () => {
+  expect(validateEmail('user@example.com')).toBe(true);
+  expect(validateEmail('invalid')).toBe(false);
+});
+
+// Component test with user interaction
+test('button triggers click handler', async () => {
+  const handleClick = jest.fn();
+  render(<Button onClick={handleClick}>Click</Button>);
+  await userEvent.click(screen.getByText('Click'));
+  expect(handleClick).toHaveBeenCalledTimes(1);
+});
+```
+
+**Next Steps**
+- Add tests for auth utilities, error handlers, and API routes
+- Target: 80% coverage on critical paths
+- See [DAY27_S_UNIT_TESTING.md](DAY27_S_UNIT_TESTING.md) for detailed testing documentation
+
+#### Validation Testing
+- Old script: `scripts/test-zod-validation.js` (sample cURL-style tests to assert validation success/failure)
 - Run: `node scripts/test-zod-validation.js`
 
 ---
@@ -199,8 +243,9 @@ curl -X POST http://localhost:3000/api/users \
 - Routes updated: users, users/[id], tasks, tasks/[id], comments, comments/[id]
 - Error envelopes: `success=false`, `message="Validation failed"`, `error.code=E001`, `error.details=[{field, message, code}]`
 - Boilerplate reduced: validation centralized in schemas
+- **Unit Testing**: Jest + RTL configured with sample tests and coverage reporting
 
-**What this delivers:** Stronger data integrity, consistent client/server validation, clearer errors, faster development.
+**What this delivers:** Stronger data integrity, consistent client/server validation, clearer errors, faster development, and automated test coverage.
 * updatedAt
 
 ---
