@@ -55,7 +55,8 @@
         "options": {
           "awslogs-group": "/ecs/sprintlite-app",
           "awslogs-region": "us-east-1",
-          "awslogs-stream-prefix": "ecs"
+          "awslogs-stream-prefix": "ecs",
+          "awslogs-datetime-format": "%Y-%m-%d %H:%M:%S"
         }
       },
       "healthCheck": {
