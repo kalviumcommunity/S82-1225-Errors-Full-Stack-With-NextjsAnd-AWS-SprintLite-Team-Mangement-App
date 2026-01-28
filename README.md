@@ -863,43 +863,140 @@ Developer → develop branch → Auto-deploy to Dev
 
 ### 4. Cloud Deployment Strategy
 
-#### AWS Deployment Options
+#### AWS Deployment: ECS on Fargate (Recommended)
 
-**Option 1: AWS Elastic Container Service (ECS)**
-- Deploy Docker containers directly
-- Use AWS Fargate for serverless container execution
-- Auto-scaling based on traffic
-- Integrated with Application Load Balancer
+We implemented a complete AWS ECS/Fargate deployment pipeline with automatic Docker image builds and deployments on every push to `main`.
 
-**Option 2: AWS EC2 with Docker**
+**Architecture Overview:**
+```
+GitHub Push (main) 
+    ↓
+GitHub Actions 
+    ├─ Build Docker Image
+    ├─ Push to AWS ECR
+    └─ Update ECS Service
+         ↓
+    AWS ECR (Container Registry)
+         ↓
+    AWS ECS Cluster + Fargate Tasks
+         ├─ Application Load Balancer
+         ├─ Auto-scaling (2-10 tasks)
+         └─ CloudWatch Logs & Monitoring
+         ↓
+    Production Database (Neon PostgreSQL)
+    Session Cache (AWS ElastiCache Redis)
+```
+
+**Why ECS on Fargate?**
+- ✅ Serverless - No EC2 instance management
+- ✅ Auto-scaling - Scale tasks based on CPU/memory
+- ✅ Cost-efficient - Pay only for compute used
+- ✅ Integrated monitoring - CloudWatch integration
+- ✅ Security - VPC isolation, IAM roles, Secrets Manager
+
+**Deployment Files:**
+- [Dockerfile](Dockerfile) - Multi-stage build (deps → builder → runner)
+- [docker-compose.yml](docker-compose.yml) - Local development stack
+- [task-definition.json](task-definition.json) - ECS task configuration
+- [.github/workflows/ci.yml](.github/workflows/ci.yml) - GitHub Actions pipeline
+
+**Setup Instructions:**
+
+1. **Create AWS ECR Repository:**
+```bash
+aws ecr create-repository \
+  --repository-name sprintlite-app \
+  --region us-east-1
+```
+
+2. **Configure GitHub Secrets:**
+```
+AWS_ACCESS_KEY_ID → Your AWS access key
+AWS_SECRET_ACCESS_KEY → Your AWS secret key
+AWS_REGION → us-east-1
+AWS_ECR_REPOSITORY → sprintlite-app
+AWS_ECS_CLUSTER_NAME → sprintlite-cluster
+AWS_ECS_SERVICE_NAME → sprintlite-app-service
+AWS_ECS_TASK_DEFINITION → sprintlite-app-task
+```
+
+3. **Register ECS Task Definition:**
+```bash
+aws ecs register-task-definition \
+  --cli-input-json file://task-definition.json
+```
+
+4. **Create ECS Service:**
+```bash
+aws ecs create-service \
+  --cluster sprintlite-cluster \
+  --service-name sprintlite-app-service \
+  --task-definition sprintlite-app-task \
+  --desired-count 2 \
+  --launch-type FARGATE \
+  --network-configuration "awsvpcConfiguration={subnets=[subnet-xxx,subnet-yyy],securityGroups=[sg-xxx]}"
+```
+
+5. **Verify Deployment:**
+```bash
+# Check running tasks
+aws ecs list-tasks --cluster sprintlite-cluster
+
+# View service status
+aws ecs describe-services \
+  --cluster sprintlite-cluster \
+  --services sprintlite-app-service
+```
+
+**Automatic Deployment (CI/CD):**
+- Push to `main` branch triggers GitHub Actions
+- Docker image builds and pushes to ECR
+- ECS task definition updates with new image
+- Service replaces old tasks with new ones
+- CloudWatch monitors health and logs
+
+**Documentation:**
+See [DAY26_M_DOCKER_DEPLOYMENT.md](DAY26_M_DOCKER_DEPLOYMENT.md) for comprehensive deployment guide including IAM policies, security best practices, troubleshooting, and autoscaling configuration.
+
+**Monitoring & Logs:**
+```bash
+# View real-time application logs
+aws logs tail /ecs/sprintlite-app --follow
+
+# Check container health
+curl https://your-load-balancer-url/api/health
+
+# View ECS events
+aws ecs describe-services \
+  --cluster sprintlite-cluster \
+  --services sprintlite-app-service \
+  --query 'services[0].events'
+```
+
+#### Other Deployment Options
+
+**Option 1: AWS EC2 with Docker**
 - Provision EC2 instance
 - Install Docker and Docker Compose
 - Pull and run containers
 - More control, requires manual management
 
-**Option 3: AWS Elastic Beanstalk**
+**Option 2: AWS Elastic Beanstalk**
 - Upload Dockerfile or docker-compose.yml
 - Automatic environment provisioning
 - Built-in monitoring and logging
 - Easiest for beginners
 
-#### Azure Deployment Options
-
-**Option 1: Azure Container Apps**
+**Option 3: Azure Container Apps**
 - Serverless container hosting
 - Built-in scaling and load balancing
 - Integrated with Azure Database for PostgreSQL
 - Managed Redis cache available
 
-**Option 2: Azure App Service (Containers)**
+**Option 4: Azure App Service (Containers)**
 - Deploy Docker image directly
 - Continuous deployment from GitHub Actions
 - Easy environment variable management
-
-**Option 3: Azure Kubernetes Service (AKS)**
-- Full Kubernetes orchestration
-- Best for complex microservices
-- Overkill for our current scale
 
 ---
 
