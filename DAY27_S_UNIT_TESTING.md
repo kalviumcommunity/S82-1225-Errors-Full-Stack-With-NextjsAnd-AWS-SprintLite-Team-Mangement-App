@@ -194,7 +194,6 @@ Tests will automatically run on:
 - Can fail builds if coverage thresholds aren't met
 
 ## Test Structure
-
 ```
 __tests__/
 ├── Button.test.jsx          # Component tests
