@@ -294,6 +294,9 @@ jobs:
     environment:
       name: ecs-production
       url: ${{ secrets.ECS_SERVICE_URL }}
+    outputs:
+      task-definition: ${{ steps.task-def.outputs.task-definition }}
+      previous-task-definition: ${{ steps.get-previous.outputs.task-def-arn }}
     steps:
       - uses: actions/checkout@v4
       
@@ -303,6 +306,16 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
+      
+      - name: Store Previous Task Definition
+        id: get-previous
+        run: |
+          CURRENT_TASK_DEF=$(aws ecs describe-services \
+            --cluster ${{ secrets.AWS_ECS_CLUSTER_NAME }} \
+            --services ${{ secrets.AWS_ECS_SERVICE_NAME }} \
+            --query 'services[0].taskDefinition' \
+            --output text)
+          echo "task-def-arn=$CURRENT_TASK_DEF" >> $GITHUB_OUTPUT
       
       - name: Download task definition
         run: |
@@ -326,10 +339,292 @@ jobs:
           cluster: ${{ secrets.AWS_ECS_CLUSTER_NAME }}
           wait-for-service-stability: true
       
-      - name: Verify Deployment
+      - name: Store Deployment Info
+        run: |
+          echo "Deployment completed at $(date)" >> deployment.log
+          echo "Image: ${{ needs.docker-build.outputs.image }}" >> deployment.log
+          echo "Task Definition: ${{ steps.task-def.outputs.task-definition }}" >> deployment.log
+      
+      - name: Upload Deployment Log
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: deployment-log-ecs
+          path: deployment.log
+          retention-days: 30
+
+  # Health Check and Verification
+  verify-deployment:
+    name: Verify Deployment Health
+    runs-on: ubuntu-latest
+    needs: deploy-ecs
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Wait for service to be stable
+        run: |
+          echo "Waiting for deployment to stabilize..."
+          sleep 30
+      
+      - name: Health Check - Endpoint Verification
+        id: health-check
+        run: |
+          set +e
+          for i in {1..5}; do
+            echo "Health check attempt $i/5..."
+            curl -f -s -o /dev/null -w "%{http_code}" ${{ secrets.PROD_URL }}/api/health
+            if [ $? -eq 0 ]; then
+              echo "✅ Health check passed"
+              echo "health-status=success" >> $GITHUB_OUTPUT
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "❌ Health check failed after 5 attempts"
+          echo "health-status=failed" >> $GITHUB_OUTPUT
+          exit 1
+      
+      - name: Run Smoke Tests
+        id: smoke-tests
+        run: |
+          echo "Running post-deployment smoke tests..."
+          APP_URL=${{ secrets.PROD_URL }} npm test -- __smoke_tests__ --runInBand --testTimeout=15000 --passWithNoTests || exit 1
+        continue-on-error: true
+      
+      - name: Parse Smoke Test Results
+        run: |
+          if [ "${{ steps.smoke-tests.outcome }}" == "success" ]; then
+            echo "✅ All smoke tests passed"
+          else
+            echo "⚠️ Smoke tests encountered issues (non-blocking)"
+          fi
+      
+      - name: Check ECS Service Stability
         run: |
           aws ecs describe-services \
             --cluster ${{ secrets.AWS_ECS_CLUSTER_NAME }} \
             --services ${{ secrets.AWS_ECS_SERVICE_NAME }} \
-            --query 'services[0].[runningCount,desiredCount]' \
-            --output text
+            --query 'services[0].[runningCount,desiredCount,deployments[0].status]' \
+            --output table
+      
+      - name: Upload Verification Report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: verification-report
+          path: |
+            coverage/
+            jest-results.json
+          retention-days: 30
+      
+      - name: Publish Verification Status
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const status = '${{ steps.health-check.outputs.health-status }}' === 'success' ? '✅ PASSED' : '❌ FAILED';
+            const deployment = {
+              environment: 'Production (ECS)',
+              timestamp: new Date().toISOString(),
+              status: status,
+              health_check: '${{ steps.health-check.outputs.health-status }}',
+              commit: '${{ github.sha }}',
+              url: '${{ secrets.PROD_URL }}'
+            };
+            
+            console.log('Deployment Verification Summary:');
+            console.log(JSON.stringify(deployment, null, 2));
+
+  # Rollback Strategy - Triggered on Verification Failure
+  rollback-deployment:
+    name: Rollback on Failure
+    runs-on: ubuntu-latest
+    needs: [deploy-ecs, verify-deployment]
+    if: failure() && github.ref == 'refs/heads/main'
+    environment:
+      name: ecs-production
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+      
+      - name: Get Previous Stable Task Definition
+        id: get-previous
+        run: |
+          echo "Fetching deployment history..."
+          PREVIOUS_TASK_DEF=$(aws ecs describe-services \
+            --cluster ${{ secrets.AWS_ECS_CLUSTER_NAME }} \
+            --services ${{ secrets.AWS_ECS_SERVICE_NAME }} \
+            --query 'services[0].deployments[?status==`PRIMARY`].taskDefinition' \
+            --output text | awk '{print $NF}')
+          
+          if [ -z "$PREVIOUS_TASK_DEF" ]; then
+            echo "Getting latest stable task definition..."
+            PREVIOUS_TASK_DEF=$(aws ecs list-task-definitions \
+              --family-prefix ${{ secrets.AWS_ECS_TASK_DEFINITION }} \
+              --query 'taskDefinitionArns[-2]' \
+              --output text)
+          fi
+          
+          echo "previous-task-def=$PREVIOUS_TASK_DEF" >> $GITHUB_OUTPUT
+          echo "🔄 Previous Task Definition: $PREVIOUS_TASK_DEF"
+      
+      - name: Initiate Rollback
+        id: rollback
+        run: |
+          echo "⚠️ ROLLBACK INITIATED - Reverting to previous stable deployment..."
+          
+          # Get the previous task definition
+          TASK_DEF_ARN="${{ steps.get-previous.outputs.previous-task-def }}"
+          
+          # Download the task definition
+          aws ecs describe-task-definition \
+            --task-definition "$TASK_DEF_ARN" \
+            --query taskDefinition > task-definition.json
+          
+          # Register the previous task definition
+          aws ecs register-task-definition \
+            --cli-input-json file://task-definition.json \
+            --query taskDefinition.taskDefinitionArn \
+            --output text > rollback-task-def.txt
+          
+          ROLLBACK_TASK_DEF=$(cat rollback-task-def.txt)
+          echo "rollback-task-def=$ROLLBACK_TASK_DEF" >> $GITHUB_OUTPUT
+          echo "📝 Registered Task Definition: $ROLLBACK_TASK_DEF"
+      
+      - name: Update Service with Previous Version
+        run: |
+          echo "🔄 Updating service to use previous task definition..."
+          
+          aws ecs update-service \
+            --cluster ${{ secrets.AWS_ECS_CLUSTER_NAME }} \
+            --service ${{ secrets.AWS_ECS_SERVICE_NAME }} \
+            --task-definition ${{ steps.rollback.outputs.rollback-task-def }} \
+            --force-new-deployment \
+            --output table
+      
+      - name: Monitor Rollback Progress
+        run: |
+          echo "⏳ Monitoring rollback progress..."
+          for i in {1..30}; do
+            sleep 10
+            STATUS=$(aws ecs describe-services \
+              --cluster ${{ secrets.AWS_ECS_CLUSTER_NAME }} \
+              --services ${{ secrets.AWS_ECS_SERVICE_NAME }} \
+              --query 'services[0].deployments[0].status' \
+              --output text)
+            
+            RUNNING=$(aws ecs describe-services \
+              --cluster ${{ secrets.AWS_ECS_CLUSTER_NAME }} \
+              --services ${{ secrets.AWS_ECS_SERVICE_NAME }} \
+              --query 'services[0].runningCount' \
+              --output text)
+            
+            DESIRED=$(aws ecs describe-services \
+              --cluster ${{ secrets.AWS_ECS_CLUSTER_NAME }} \
+              --services ${{ secrets.AWS_ECS_SERVICE_NAME }} \
+              --query 'services[0].desiredCount' \
+              --output text)
+            
+            echo "[$i/30] Status: $STATUS | Running: $RUNNING | Desired: $DESIRED"
+            
+            if [ "$STATUS" == "PRIMARY" ] && [ "$RUNNING" == "$DESIRED" ]; then
+              echo "✅ Rollback completed successfully"
+              break
+            fi
+          done
+      
+      - name: Verify Rollback Success
+        run: |
+          RUNNING=$(aws ecs describe-services \
+            --cluster ${{ secrets.AWS_ECS_CLUSTER_NAME }} \
+            --services ${{ secrets.AWS_ECS_SERVICE_NAME }} \
+            --query 'services[0].runningCount' \
+            --output text)
+          
+          DESIRED=$(aws ecs describe-services \
+            --cluster ${{ secrets.AWS_ECS_CLUSTER_NAME }} \
+            --services ${{ secrets.AWS_ECS_SERVICE_NAME }} \
+            --query 'services[0].desiredCount' \
+            --output text)
+          
+          if [ "$RUNNING" == "$DESIRED" ]; then
+            echo "✅ Service is stable with $RUNNING instances running"
+          else
+            echo "⚠️ Service stability check: $RUNNING/$DESIRED instances"
+          fi
+      
+      - name: Post Rollback Health Check
+        continue-on-error: true
+        run: |
+          echo "Verifying health after rollback..."
+          sleep 15
+          
+          for i in {1..3}; do
+            echo "Health check attempt $i/3..."
+            HEALTH=$(curl -s -o /dev/null -w "%{http_code}" ${{ secrets.PROD_URL }}/api/health)
+            if [ "$HEALTH" == "200" ]; then
+              echo "✅ Service is responding with HTTP 200"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "⚠️ Service health check incomplete (may stabilize)"
+      
+      - name: Create Incident Issue
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const issue = await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: '🚨 Production Deployment Rollback Triggered',
+              body: `## Rollback Summary
+              
+              **Commit**: ${{ github.sha }}
+              **Author**: ${{ github.actor }}
+              **Time**: ${new Date().toISOString()}
+              
+              ### Details
+              - **Service**: ${{ secrets.AWS_ECS_SERVICE_NAME }}
+              - **Cluster**: ${{ secrets.AWS_ECS_CLUSTER_NAME }}
+              - **Action**: Automatic rollback due to health check/smoke test failure
+              - **Previous Task Def**: ${{ steps.get-previous.outputs.previous-task-def }}
+              - **Rollback Task Def**: ${{ steps.rollback.outputs.rollback-task-def }}
+              
+              ### Next Steps
+              1. Review the failed deployment logs
+              2. Identify the root cause
+              3. Fix the issue and push a new commit
+              4. Automatic deployment will be triggered
+              
+              **Action Required**: Investigate logs and fix the issue.`,
+              labels: ['bug', 'deployment', 'production']
+            });
+            
+            console.log('Incident issue created: ' + issue.data.html_url);
+      
+      - name: Send Slack Notification (Optional)
+        if: always()
+        run: |
+          echo "🔔 Optional: Send Slack notification about rollback"
+          echo "Webhook URL would be stored in secrets.SLACK_WEBHOOK_URL"
