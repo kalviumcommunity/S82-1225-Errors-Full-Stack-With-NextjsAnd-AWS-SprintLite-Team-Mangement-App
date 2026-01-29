@@ -8,6 +8,38 @@ The goal of SprintLite is not to replicate a full-scale enterprise tool like Jir
 
 ---
 
+## 📚 API & System Documentation
+
+### Interactive API Documentation
+- **Swagger UI**: [/api-documentation](/api-documentation) — Interactive API explorer with request/response examples
+- **OpenAPI Spec**: [/api/docs](/api/docs) — Full OpenAPI 3.0 specification (JSON)
+- **Postman Collection**: [docs/postman_collection.json](docs/postman_collection.json) — Export and import into Postman
+
+### Architecture & Reference
+- **Architecture Guide**: [ARCHITECTURE.md](ARCHITECTURE.md) — System design, data flow, deployment setup
+- **Deployment Verification**: [DAY29_V_DEPLOY_VERIFY.md](DAY29_V_DEPLOY_VERIFY.md) — Health checks, smoke tests, rollback strategies
+
+### API Documentation Details
+- **Version**: 1.0.0
+- **Last Updated**: January 29, 2026
+- **Base URLs**:
+  - Production: `https://app.sprintlite.com`
+  - Staging: `https://staging.sprintlite.com`
+  - Development: `http://localhost:3000`
+- **Authentication**: Bearer Token (JWT) or HTTP-only Cookie
+- **Endpoints**: 15+ documented endpoints across 7 categories
+
+### Quick Documentation Links
+| Resource | Purpose | Access |
+|----------|---------|--------|
+| Swagger UI | Interactive API testing | `/api-documentation` |
+| OpenAPI JSON | Machine-readable spec | `/api/docs` |
+| Postman Collection | API client import | `docs/postman_collection.json` |
+| Architecture MD | System design & flow | `ARCHITECTURE.md` |
+| Deployment Guide | Verification & rollback | `DAY29_V_DEPLOY_VERIFY.md` |
+
+---
+
 ## Key Objectives
 
 * Build a real, usable web application
