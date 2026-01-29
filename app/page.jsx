@@ -3,14 +3,16 @@
 import Link from "next/link";
 import { useAuthContext } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useLayoutEffect, useRef } from "react";
 
 export default function HomePage() {
   const { user, isAuthenticated, logout } = useAuthContext();
   const router = useRouter();
+  const mountedRef = useRef(false);
 
-  // Auto-redirect authenticated users to dashboard
-  useEffect(() => {
+  // Handle redirect after mount
+  useLayoutEffect(() => {
+    mountedRef.current = true;
     if (isAuthenticated) {
       router.push("/dashboard");
     }
@@ -20,6 +22,10 @@ export default function HomePage() {
     logout();
     router.refresh();
   };
+
+  // Always render login/signup on initial render to prevent hydration mismatch
+  // After hydration, if authenticated, user will be redirected by useLayoutEffect
+  const showAuthLinks = !isAuthenticated;
 
   return (
     <div className="min-h-screen bg-gray-950">
@@ -46,7 +52,22 @@ export default function HomePage() {
               <span className="text-xl font-bold text-white">SprintLite</span>
             </div>
             <div className="flex items-center gap-4">
-              {isAuthenticated ? (
+              {showAuthLinks ? (
+                <>
+                  <Link
+                    href="/auth/login"
+                    className="px-4 py-2 text-gray-300 hover:text-white transition-colors"
+                  >
+                    Login
+                  </Link>
+                  <Link
+                    href="/auth/signup"
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  >
+                    Sign Up
+                  </Link>
+                </>
+              ) : (
                 <>
                   <span className="text-gray-300">Welcome, {user?.name}</span>
                   <Link
@@ -61,21 +82,6 @@ export default function HomePage() {
                   >
                     Logout
                   </button>
-                </>
-              ) : (
-                <>
-                  <Link
-                    href="/auth/login"
-                    className="px-4 py-2 text-gray-300 hover:text-white transition-colors"
-                  >
-                    Login
-                  </Link>
-                  <Link
-                    href="/auth/signup"
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                  >
-                    Sign Up
-                  </Link>
                 </>
               )}
             </div>

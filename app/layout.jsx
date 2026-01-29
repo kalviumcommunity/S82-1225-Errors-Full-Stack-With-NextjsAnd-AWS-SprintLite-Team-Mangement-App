@@ -21,7 +21,7 @@ import "./globals.css";
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
         <title>SprintLite - Task Management</title>
         <meta
@@ -33,8 +33,25 @@ export default function RootLayout({ children }) {
           content="task management, Next.js, routing, authentication, team collaboration"
         />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
+        {/* Apply dark mode immediately to prevent white flash */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                try {
+                  const theme = localStorage.getItem('theme') || 'dark';
+                  document.documentElement.classList.remove('light', 'dark');
+                  document.documentElement.classList.add(theme);
+                } catch (e) {
+                  // If localStorage fails, default to dark
+                  document.documentElement.classList.add('dark');
+                }
+              })();
+            `,
+          }}
+        />
       </head>
-      <body>
+      <body className="dark">
         <AuthProvider>
           <UIProvider>
             {children}

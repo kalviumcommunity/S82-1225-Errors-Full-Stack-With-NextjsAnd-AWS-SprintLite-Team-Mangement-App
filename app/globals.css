@@ -126,3 +126,12 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Set dark mode as default - can be overridden by light class */
+html.dark {
+  color-scheme: dark;
+}
+
+html {
+  color-scheme: light;
+}
