@@ -7,8 +7,21 @@ const createJestConfig = nextJest({
 
 const customJestConfig = {
   setupFilesAfterEnv: ["<rootDir>/jest.setup.js"],
+  // Use jsdom by default, but override for specific test suites
   testEnvironment: "jsdom",
-  collectCoverage: true,
+  projects: [
+    {
+      displayName: "unit",
+      testEnvironment: "jsdom",
+      testMatch: ["<rootDir>/__tests__/**/*.test.{js,jsx,ts,tsx}"],
+    },
+    {
+      displayName: "smoke",
+      testEnvironment: "node",
+      testMatch: ["<rootDir>/__smoke_tests__/**/*.test.{js,jsx,ts,tsx}"],
+    },
+  ],
+  collectCoverage: false,
   collectCoverageFrom: [
     "app/**/*.{js,jsx,ts,tsx}",
     "components/**/*.{js,jsx,ts,tsx}",
