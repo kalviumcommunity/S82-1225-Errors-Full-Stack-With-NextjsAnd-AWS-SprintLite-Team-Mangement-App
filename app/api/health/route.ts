@@ -1,9 +1,9 @@
-import { logger } from '@/lib/logger';
-import { responseHandler } from '@/lib/responseHandler';
+import { logger } from "@/lib/logger";
+import { sendSuccess, sendError } from "@/lib/responseHandler";
 
 /**
  * GET /api/health
- * 
+ *
  * Health check endpoint with structured logging
  * Used by:
  * - Load balancer health checks (ECS)
@@ -17,9 +17,9 @@ export async function GET(request: Request) {
 
   try {
     // Log health check request
-    logger.logRequest('GET', '/api/health', requestId, {
-      userAgent: request.headers.get('user-agent'),
-      remoteAddr: request.headers.get('x-forwarded-for') || 'unknown',
+    logger.logRequest("GET", "/api/health", requestId, {
+      userAgent: request.headers.get("user-agent"),
+      remoteAddr: request.headers.get("x-forwarded-for") || "unknown",
     });
 
     // Simulate lightweight health checks
@@ -35,27 +35,21 @@ export async function GET(request: Request) {
     const duration = Date.now() - startTime;
 
     // Log response
-    logger.logResponse(
-      'GET',
-      '/api/health',
-      statusCode,
-      duration,
-      requestId,
-      {
-        checks,
-        allHealthy,
-      }
-    );
+    logger.logResponse("GET", "/api/health", statusCode, duration, requestId, {
+      checks,
+      allHealthy,
+    });
 
     // Return response
-    return responseHandler.success(
+    return sendSuccess(
       {
-        status: allHealthy ? 'healthy' : 'degraded',
+        status: allHealthy ? "healthy" : "degraded",
         timestamp: new Date().toISOString(),
         uptime: process.uptime(),
         environment: process.env.NODE_ENV,
         checks,
       },
+      "Health check passed",
       statusCode
     );
   } catch (error) {
@@ -63,19 +57,19 @@ export async function GET(request: Request) {
 
     // Log error
     logger.logApiError(
-      'GET',
-      '/api/health',
+      "GET",
+      "/api/health",
       500,
-      error instanceof Error ? error : 'Unknown error',
+      error instanceof Error ? error : "Unknown error",
       duration,
       requestId
     );
 
-    return responseHandler.error(
-      'Health check failed',
-      'HEALTH_CHECK_ERROR',
+    return sendError(
+      "Health check failed",
+      "HEALTH_CHECK_ERROR",
       500,
-      error instanceof Error ? error.message : 'Unknown error'
+      error instanceof Error ? error.message : "Unknown error"
     );
   }
 }
